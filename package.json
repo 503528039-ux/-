@@ -1,0 +1,29 @@
+{
+  "name": "archie-catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
+    "nanoid": "^5.0.6",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.0",
+    "vuedraggable": "^4.1.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "autoprefixer": "^10.4.18",
+    "esbuild": "^0.27.3",
+    "postcss": "^8.4.35",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.4.2",
+    "vite": "^5.3.0"
+  }
+}

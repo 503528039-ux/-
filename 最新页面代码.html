@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>雅洁五金 2026 A4工程图册</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* ==========================================================================
+           1. 全局核心样式 (Global CSS)
+           ========================================================================== */
+        :root {
+            --archie-purple: #5E4585;
+            --archie-gold: #9A805E;
+            --luxury-cream: #F8F8FA;
+            --text-dark: #1D1D1F;
+            --text-gray: #86868B;
+            --divider: #E5E5EA;
+            --page-padding: 15mm;
+            --header-height: 20mm;
+            --footer-height: 15mm;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: #d1d5db;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15mm;
+            padding: 15mm 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            background-color: #fff;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+            page-break-after: always;
+        }
+
+        .page-content { flex-grow: 1; padding: 0 var(--page-padding); display: flex; flex-direction: column; }
+
+        h1, h2, h3 { font-family: 'Noto Serif SC', serif; margin: 0; color: var(--text-dark); }
+        p { margin: 0; color: var(--text-gray); }
+
+        .page-header {
+            height: var(--header-height);
+            display: flex;
+            justify-content: flex-end;
+            align-items: flex-end;
+            padding: 0 var(--page-padding) 4mm var(--page-padding);
+            border-bottom: 0.5px solid var(--divider);
+            margin-bottom: 8mm;
+        }
+        .header-title { font-size: 11px; font-weight: 500; color: var(--text-gray); letter-spacing: 3px; text-transform: uppercase; }
+        
+        .page-footer {
+            height: var(--footer-height);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 9px;
+            color: var(--text-gray);
+            letter-spacing: 2px;
+            font-family: 'Inter', monospace;
+        }
+
+        /* ==========================================================================
+           2. 核心组件库 (UI Components)
+           ========================================================================== */
+        
+        /* 2.1 标题与图文排版 */
+        .section-title { font-size: 28px; color: var(--archie-purple); margin-bottom: 5px; }
+        .section-subtitle { font-size: 11px; color: var(--archie-gold); letter-spacing: 2px; margin-bottom: 15mm; text-transform: uppercase; }
+        .hero-img { width: calc(100% + var(--page-padding) * 2); height: 110mm; background: #000; margin-left: calc(var(--page-padding) * -1); margin-right: calc(var(--page-padding) * -1); margin-bottom: 12mm; overflow: hidden; position: relative; }
+        .hero-img img { width: 100%; height: 100%; object-fit: cover; opacity: 0.9;}
+        .text-cols { display: column; column-count: 2; column-gap: 12mm; font-size: 12px; line-height: 2; color: var(--text-dark); text-align: justify; }
+
+        /* 2.2 特殊网格 (资质/伙伴/工艺) */
+        .grid-cert { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12mm; margin-top: 15mm; margin-bottom: 10mm;}
+        .cert-box { border: 1px solid var(--divider); height: 75mm; border-radius: 6px; display: flex; align-items: center; justify-content: center; flex-direction: column; background: #fff;}
+        .cert-box img { width: 60%; opacity: 0.6; margin-bottom: 15px;}
+        .cert-text { font-size: 10px; color: var(--text-gray); text-align: center; padding: 0 4px; font-weight: 500;}
+
+        .grid-partner { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm; margin-top: 15mm; }
+        .partner-box { background: var(--luxury-cream); height: 35mm; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--text-gray); transition: all 0.3s;}
+
+        .grid-finishes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6mm 4mm; margin-top: 5mm; }
+        .finish-item { display: flex; flex-direction: column; align-items: center; text-align: center; }
+        .finish-swatch { width: 18mm; height: 18mm; border-radius: 50%; margin-bottom: 8px; box-shadow: inset 0 2px 8px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.08); }
+        .finish-name { font-size: 10px; font-weight: 700; color: var(--text-dark); margin-bottom: 3px; }
+        .finish-en { font-size: 7px; color: var(--text-gray); font-family: 'Inter'; text-transform: uppercase; letter-spacing: 0.2px; line-height: 1.1;}
+        .swatch-pvd { background: linear-gradient(135deg, #e6c27a 0%, #b8860b 50%, #8b6508 100%); }
+        .swatch-black { background: linear-gradient(135deg, #333 0%, #1a1a1a 50%, #000 100%); }
+        .swatch-nickel { background: linear-gradient(135deg, #d3d3d3 0%, #a9a9a9 50%, #808080 100%); }
+        .swatch-gunmetal { background: linear-gradient(135deg, #7a7a8c 0%, #4a4a5a 50%, #2a2a3a 100%); }
+        .swatch-bronze { background: linear-gradient(135deg, #cd7f32 0%, #8b4513 50%, #5c3317 100%); }
+        .swatch-white { background: linear-gradient(135deg, #fff 0%, #f0f0f0 50%, #e0e0e0 100%); border: 1px solid var(--divider); }
+
+        /* 2.3 目录与过渡页 */
+        .toc-list { list-style: none; padding: 0; margin-top: 10mm; width: 85%; margin-left: auto; margin-right: auto; }
+        .toc-item { display: flex; align-items: baseline; margin-bottom: 8mm; }
+        .toc-title { font-size: 16px; font-weight: 600; color: var(--archie-purple); margin-right: 15px; }
+        .toc-en { font-size: 11px; color: var(--text-gray); letter-spacing: 1px; }
+        .toc-dots { flex-grow: 1; border-bottom: 1px dotted var(--text-gray); margin: 0 15px; opacity: 0.5; }
+        .toc-page { font-size: 14px; font-family: 'Inter'; font-weight: 600; color: var(--archie-gold); }
+
+        .divider-page { background-color: var(--archie-purple); color: #fff; justify-content: center; padding-left: 30mm; position: relative; overflow: hidden; }
+        .divider-page h2 { color: #fff; font-size: 56px; letter-spacing: 8px; margin-bottom: 15px; position: relative; z-index: 2;}
+        .divider-page p { color: var(--archie-gold); font-size: 14px; letter-spacing: 4px; position: relative; z-index: 2;}
+        .divider-line { width: 80px; height: 1.5px; background-color: var(--archie-gold); margin-top: 40px; position: relative; z-index: 2;}
+        .divider-number { font-size: 450px; font-weight: 900; color: rgba(255,255,255,0.04); position: absolute; bottom: -40mm; right: -25mm; line-height: 0.8; font-family: 'Inter'; z-index: 1;}
+
+        /* 2.4 产品 6 宫格核心样式 */
+        .grid-6 { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr); gap: 8mm; flex-grow: 1; padding-bottom: 5mm; }
+        .product-card { display: flex; flex-direction: column; }
+        
+        /* 实拍模式图片容器 */
+        .card-img-box { height: 48mm; background-color: rgba(134, 134, 139, 0.04); border-radius: 12px; display: flex; justify-content: center; align-items: center; padding: 10mm; position: relative; }
+        .card-img-box img { max-width: 100%; max-height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+        
+        /* 复合模式 (实拍+线图) 图片容器 */
+        .composite-mode .card-img-box {
+            background-color: #fff; border: 0.5px solid rgba(154, 128, 94, 0.3); border-radius: 6px;
+            background-image: linear-gradient(rgba(154, 128, 94, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(154, 128, 94, 0.05) 1px, transparent 1px);
+            background-size: 5mm 5mm; display: flex; justify-content: space-between; align-items: center; padding: 5mm 3mm;
+        }
+        .composite-photo { width: 58%; height: 90%; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; }
+        .composite-photo img { max-width: 100%; max-height: 100%; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.08)); }
+        .composite-line { width: 38%; height: 85%; display: flex; align-items: center; justify-content: center; border-left: 1px dashed rgba(154, 128, 94, 0.4); position: relative; padding-left: 3mm;}
+        .composite-line img { max-width: 100%; max-height: 100%; filter: contrast(200%) grayscale(100%) brightness(0.85); mix-blend-mode: multiply; opacity: 0.6; }
+        .tech-tag { position: absolute; top: -6px; right: 0px; font-size: 7px; color: var(--text-gray); font-family: monospace; background: #fff; padding: 0 4px; }
+
+        /* 产品信息区 */
+        .card-info { padding-top: 12px; flex-grow: 1; display: flex; flex-direction: column; }
+        .card-title { font-size: 15px; font-weight: 700; color: var(--text-dark); margin-bottom: 2px; }
+        .composite-mode .card-title { font-size: 14px; }
+        .card-model { font-size: 11px; font-family: 'Inter'; color: var(--archie-purple); font-weight: 600; margin-bottom: 10px; }
+        .composite-mode .card-model { font-size: 10px; }
+        .card-specs-mini { display: flex; flex-direction: column; gap: 4px; }
+        .mini-spec-row { display: flex; justify-content: space-between; font-size: 10px; border-bottom: 0.5px dashed #E5E5EA; padding-bottom: 3px; }
+        .composite-mode .mini-spec-row { font-size: 9px; }
+        .mini-label { color: var(--text-gray); }
+        .mini-value { color: var(--text-dark); font-weight: 500; }
+
+        /* ==========================================================================
+           3. 独立页面特有样式 (Page Specific CSS)
+           ========================================================================== */
+        
+        /* 封面特有 */
+        .cover-page { justify-content: center; align-items: center; text-align: center; padding: 20mm; z-index: 1; background: radial-gradient(circle at 50% 30%, #644B8E 0%, #2A1A40 100%); }
+        .cover-watermark { position: absolute; top: 10%; left: 50%; transform: translateX(-50%); font-size: 200px; font-family: 'Inter', sans-serif; font-weight: 900; color: #ffffff; opacity: 0.04; letter-spacing: 40px; z-index: -2; white-space: nowrap; pointer-events: none; }
+        .cover-crop-marks { position: absolute; top: 12mm; left: 12mm; right: 12mm; bottom: 12mm; z-index: 0; pointer-events: none; }
+        .crop-tl, .crop-tr, .crop-bl, .crop-br { position: absolute; width: 30px; height: 30px; border-color: var(--archie-gold); border-style: solid; border-width: 0; opacity: 0.8; }
+        .crop-tl { top: 0; left: 0; border-top-width: 1.5px; border-left-width: 1.5px; }
+        .crop-tr { top: 0; right: 0; border-top-width: 1.5px; border-right-width: 1.5px; }
+        .crop-bl { bottom: 0; left: 0; border-bottom-width: 1.5px; border-left-width: 1.5px; }
+        .crop-br { bottom: 0; right: 0; border-bottom-width: 1.5px; border-right-width: 1.5px; }
+        .cover-sketch-bg { position: absolute; bottom: -4%; left: -10%; width: 110%; height: auto; z-index: -1; opacity: 0.12; mix-blend-mode: screen; pointer-events: none; }
+        .cover-page h2.en-brand { font-size: 22px; color: var(--archie-gold); letter-spacing: 16px; margin-bottom: 25px; font-weight: 400; margin-left: 16px;}
+        .cover-page h1.cn-brand { font-size: 100px; color: #ffffff; letter-spacing: 24px; margin-bottom: 10px; margin-left: 24px; line-height: 1.1; text-shadow: 0 10px 30px rgba(0,0,0,0.3);}
+        .cover-page .year { font-size: 46px; color: #ffffff; letter-spacing: 14px; font-weight: 300; margin-left: 14px; opacity: 0.9;} 
+
+        /* 封底特有 */
+        .back-cover { background-color: var(--archie-purple); color: #fff; justify-content: center; align-items: center; text-align: center;}
+        .qr-code { width: 35mm; height: 35mm; background: #fff; padding: 2mm; margin: 20mm auto; border-radius: 4px;}
+        .qr-code img { width: 100%; height: 100%; object-fit: cover; opacity: 0.5;}
+        .contact-info { font-size: 11px; line-height: 2; color: rgba(255,255,255,0.7); letter-spacing: 1px;}
+        
+        @media print {
+            body { background: none; padding: 0; gap: 0; }
+            .a4-page { box-shadow: none; margin: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ================== PAGE 01: 封面 ================== -->
+    <div class="a4-page cover-page">
+        <div class="cover-watermark">ARCHIE</div>
+        <div class="cover-crop-marks">
+            <div class="crop-tl"></div><div class="crop-tr"></div>
+            <div class="crop-bl"></div><div class="crop-br"></div>
+        </div>
+        <div class="cover-sketch-bg">
+            <svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="width: 110%; transform: rotate(-5deg);">
+                <defs>
+                    <linearGradient id="modern-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#C5A87B"/><stop offset="40%" stop-color="#9A805E"/><stop offset="70%" stop-color="#5E4B35"/><stop offset="100%" stop-color="#2A1E12"/>
+                    </linearGradient>
+                    <filter id="luxury-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feDropShadow dx="15" dy="25" stdDeviation="20" flood-color="#000000" flood-opacity="0.5"/>
+                    </filter>
+                </defs>
+                <g filter="url(#luxury-shadow)">
+                    <circle cx="150" cy="180" r="70" fill="url(#modern-gold)"/>
+                    <circle cx="150" cy="180" r="55" fill="none" stroke="#C5A87B" stroke-width="2" opacity="0.3"/>
+                    <circle cx="150" cy="180" r="30" fill="url(#modern-gold)"/><circle cx="150" cy="180" r="18" fill="#111" opacity="0.8"/>
+                    <circle cx="150" cy="380" r="70" fill="url(#modern-gold)"/><circle cx="150" cy="380" r="55" fill="none" stroke="#C5A87B" stroke-width="2" opacity="0.3"/>
+                    <circle cx="150" cy="368" r="12" fill="#111"/><path d="M 143 368 L 138 398 C 138 405, 162 405, 162 398 L 157 368 Z" fill="#111"/>
+                    <path d="M 150 162 C 200 162, 280 165, 420 165 C 445 165, 455 175, 455 180 C 455 185, 445 195, 420 195 L 150 195 Z" fill="url(#modern-gold)"/>
+                    <path d="M 160 165 C 220 168, 300 168, 410 168" fill="none" stroke="#C5A87B" stroke-width="3" opacity="0.4"/>
+                </g>
+            </svg>
+        </div>
+        <h2 class="en-brand">ARCHIE</h2>
+        <h1 class="cn-brand">雅洁五金</h1>
+        <div style="width: 2px; height: 50mm; background-color: var(--archie-gold); margin: 15mm auto; box-shadow: 0 0 10px rgba(154,128,94,0.5);"></div>
+        <div class="year">2026 工程产品手册</div>
+        <div style="font-size: 10px; letter-spacing: 5px; color: var(--archie-gold); margin-top: 15px; opacity: 0.8;">ENGINEERING SOLUTIONS</div>
+    </div>
+
+    <!-- ================== PAGE 02: 公司简介 ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 公司概况</div></header>
+        <div class="page-content">
+            <h2 class="section-title">品牌故事</h2><div class="section-subtitle">Company Profile</div>
+            <div class="hero-img"><img src="https://placehold.co/800x400/E5E5EA/86868B?text=[+雅洁工业园外观+]" alt="雅洁工业园"></div>
+            <div class="text-cols">
+                雅洁五金（ARCHIE），始创于1990年，总部位于中国建筑五金之都。三十多年来，我们始终专注于高端建筑门控五金、智能安防系统及卫浴挂件的研发、制造与销售，是国内最具规模和影响力的工程五金解决方案供应商之一。<br><br>
+                在占地面积超 10 万平方米的现代化工业园内，雅洁拥有行业领先的自动化压铸、CNC精密加工、全自动抛光及无尘环保电镀生产线。从原材料入库到成品交付，每一道工序都严格遵循 ISO9001 质量管理体系标准，确保每一件产品都能达到卓越的精度与耐用性。<br><br>
+                设计，是雅洁的灵魂。我们拥有百人规模的工业设计及技术研发团队，历年来荣获红星奖、红点奖等多项国内外顶级设计大奖。雅洁不仅提供标准的五金产品，更为高端酒店、商业综合体、甲级写字楼及豪宅项目提供深度定制的“静音、安全、极简”门控整体解决方案。
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 02 -</div>
+    </div>
+
+    <!-- ================== PAGE 03: 荣誉资质 ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 荣誉与资质</div></header>
+        <div class="page-content">
+            <h2 class="section-title">权威认证与资质</h2><div class="section-subtitle">Certificates & Honors</div>
+            <div class="grid-cert">
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=ISO9001"><div class="cert-text">ISO9001 质量体系认证</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=CE"><div class="cert-text">欧盟 CE 安全认证</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=UL"><div class="cert-text">美国 UL 防火认证</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=RedDot"><div class="cert-text">德国红点设计大奖</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=Top10"><div class="cert-text">中国智能锁十大品牌</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=Patent"><div class="cert-text">静音锁体发明专利</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=HighTech"><div class="cert-text">国家高新技术企业</div></div>
+                <div class="cert-box"><img src="https://placehold.co/100x140/F8F8FA/86868B?text=Green"><div class="cert-text">绿色建材产品认证</div></div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 03 -</div>
+    </div>
+
+    <!-- ================== PAGE 04: 合作伙伴 ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 战略合作伙伴</div></header>
+        <div class="page-content">
+            <h2 class="section-title">战略合作伙伴</h2><div class="section-subtitle">Global Partners</div>
+            <div class="grid-partner">
+                <div class="partner-box">万科地产 Vanke</div><div class="partner-box">保利发展 Poly</div><div class="partner-box">华润置地 CR Land</div>
+                <div class="partner-box">中海地产 COLI</div><div class="partner-box">绿城中国 Greentown</div><div class="partner-box">卓越集团 Excellence</div>
+                <div class="partner-box">希尔顿 Hilton</div><div class="partner-box">万豪 Marriott</div><div class="partner-box">洲际酒店 IHG</div>
+                <div class="partner-box">凯悦 Hyatt</div><div class="partner-box">香格里拉 Shangri-La</div><div class="partner-box">温德姆 Wyndham</div>
+                <div class="partner-box">金螳螂 Gold Mantis</div><div class="partner-box">亚厦股份 Yasha</div><div class="partner-box">广田集团 Grandland</div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 04 -</div>
+    </div>
+
+    <!-- ================== PAGE 05: 工程案例 ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 经典工程案例</div></header>
+        <div class="page-content">
+            <h2 class="section-title">筑造地标</h2><div class="section-subtitle">Engineering Cases</div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 6mm 5mm; margin-top: 5mm; flex-grow: 1; padding-bottom: 10mm;">
+                <!-- Row 1 -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/333/666?text=[+上海中心大厦+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">COMMERCIAL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">上海中心大厦</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Shanghai Tower</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/444/777?text=[+洲际度假酒店+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">HOTEL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">三亚海棠湾洲际酒店</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">IHG Resort Sanya</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/555/888?text=[+深圳平安中心+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">OFFICE</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">深圳平安金融中心</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Ping An Finance Center</p>
+                </div>
+                <!-- Row 2 -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/666/999?text=[+广州周大福+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">COMMERCIAL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">广州周大福金融中心</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">CTF Finance Centre</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/777/AAA?text=[+北京瑰丽酒店+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">HOTEL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">北京瑰丽酒店</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Rosewood Beijing</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/888/BBB?text=[+杭州柏悦酒店+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">HOTEL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">杭州柏悦酒店</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Park Hyatt Hangzhou</p>
+                </div>
+                <!-- Row 3 -->
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/999/CCC?text=[+成都万象城+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">COMMERCIAL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">成都万象城</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Chengdu MixC</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/AAA/DDD?text=[+武汉IFS+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">OFFICE</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">武汉国际金融中心</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">Wuhan IFS</p>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <div style="width: 100%; height: 60mm; position: relative; overflow: hidden; background: #000; margin-bottom: 6px;">
+                        <img src="https://placehold.co/400x300/BBB/EEE?text=[+澳门W酒店+]" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.8;">
+                        <div style="position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.6); color: var(--archie-gold); padding: 3px 6px; font-size: 7px; letter-spacing: 1px;">HOTEL</div>
+                    </div>
+                    <h3 style="font-size: 12px; margin-bottom: 2px; color: var(--text-dark);">澳门 W 酒店</h3>
+                    <p style="font-size: 8px; color: var(--text-gray);">W Macau</p>
+                </div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 05 -</div>
+    </div>
+
+    <!-- ================== PAGE 06: 表面处理 ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 表面处理工艺</div></header>
+        <div class="page-content">
+            <h2 class="section-title">质感美学</h2><div class="section-subtitle">Surface Finishes</div>
+            <p style="font-size: 12px; line-height: 1.8; margin-bottom: 8mm; max-width: 90%;">
+                雅洁五金拥有行业顶级的无尘电镀及 PVD 真空镀膜生产线。通过数十道严苛的表面处理工艺，为五金产品赋予极具层次感的光影美学。
+            </p>
+            <div class="grid-finishes">
+                <!-- 第 1 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">PVD 钛金</div><div class="finish-en">PVD Titanium</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">哑光黑</div><div class="finish-en">Matte Black</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">拉丝砂镍</div><div class="finish-en">Satin Nickel</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">拉丝枪灰</div><div class="finish-en">Gunmetal</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">青古铜</div><div class="finish-en">A. Bronze</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">烤漆白</div><div class="finish-en">Baked White</div></div>
+                <!-- 第 2 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">镜面金</div><div class="finish-en">Polished Gold</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">氟碳黑</div><div class="finish-en">Fluorocarbon</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">珍珠镍</div><div class="finish-en">Pearl Nickel</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">深空灰</div><div class="finish-en">Space Gray</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">红古铜</div><div class="finish-en">Red Bronze</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">象牙白</div><div class="finish-en">Ivory White</div></div>
+                <!-- 第 3 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">香槟金</div><div class="finish-en">Champagne</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">黑拉丝</div><div class="finish-en">Brushed Black</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">亮铬</div><div class="finish-en">Polished Chrome</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">哑光枪灰</div><div class="finish-en">Matte Gunmetal</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">黄古铜</div><div class="finish-en">Yellow Bronze</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">极地白</div><div class="finish-en">Polar White</div></div>
+                <!-- 第 4 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">玫瑰金</div><div class="finish-en">Rose Gold</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">碳素黑</div><div class="finish-en">Carbon Black</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">砂铬</div><div class="finish-en">Satin Chrome</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">陨石灰</div><div class="finish-en">Meteorite Gray</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">咖啡古铜</div><div class="finish-en">Coffee Bronze</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">珠光白</div><div class="finish-en">Pearl White</div></div>
+                <!-- 第 5 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">拉丝金</div><div class="finish-en">Brushed Gold</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">曜石黑</div><div class="finish-en">Obsidian Black</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">不锈钢亮光</div><div class="finish-en">Polished SS</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">银灰</div><div class="finish-en">Silver Gray</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">仿金铜</div><div class="finish-en">Imitation Brass</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">奶油白</div><div class="finish-en">Cream White</div></div>
+                <!-- 第 6 行 -->
+                <div class="finish-item"><div class="finish-swatch swatch-pvd"></div><div class="finish-name">仿金</div><div class="finish-en">Imitation Gold</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-black"></div><div class="finish-name">晶钻黑</div><div class="finish-en">Diamond Black</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-nickel"></div><div class="finish-name">不锈钢砂光</div><div class="finish-en">Satin SS</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-gunmetal"></div><div class="finish-name">铁灰</div><div class="finish-en">Iron Gray</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-bronze"></div><div class="finish-name">紫古铜</div><div class="finish-en">Purple Bronze</div></div>
+                <div class="finish-item"><div class="finish-swatch swatch-white"></div><div class="finish-name">陶瓷白</div><div class="finish-en">Ceramic White</div></div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 06 -</div>
+    </div>
+
+    <!-- ================== PAGE 07: 目录页 ================== -->
+    <div class="a4-page">
+        <div class="page-content" style="padding-top: 30mm;">
+            <h2 style="font-size: 32px; color: var(--archie-purple); margin-bottom: 5px;">总目录</h2>
+            <p style="font-size: 12px; color: var(--archie-gold); letter-spacing: 2px; margin-bottom: 15mm;">TABLE OF CONTENTS</p>
+            <ul class="toc-list">
+                <li class="toc-item"><span class="toc-title">01 / 品牌故事</span><span class="toc-en">Profile</span><span class="toc-dots"></span><span class="toc-page">02</span></li>
+                <li class="toc-item"><span class="toc-title">02 / 荣誉资质</span><span class="toc-en">Certificates</span><span class="toc-dots"></span><span class="toc-page">03</span></li>
+                <li class="toc-item"><span class="toc-title">03 / 战略合作</span><span class="toc-en">Partners</span><span class="toc-dots"></span><span class="toc-page">04</span></li>
+                <li class="toc-item"><span class="toc-title">04 / 工程案例</span><span class="toc-en">Cases</span><span class="toc-dots"></span><span class="toc-page">05</span></li>
+                <li class="toc-item" style="margin-bottom: 8mm;"><span class="toc-title">05 / 表面工艺</span><span class="toc-en">Finishes</span><span class="toc-dots"></span><span class="toc-page">06</span></li>
+                
+                <li class="toc-item"><span class="toc-title">06 / 门锁五金系列 (实拍版)</span><span class="toc-en">Locks Photo</span><span class="toc-dots"></span><span class="toc-page">09</span></li>
+                <li class="toc-item" style="margin-bottom: 6mm;"><span class="toc-title">07 / 工程小五金系列 (实拍版)</span><span class="toc-en">Hardware Photo</span><span class="toc-dots"></span><span class="toc-page">10</span></li>
+                
+                <li class="toc-item"><span class="toc-title" style="color: var(--archie-gold);">08 / 门锁五金 (实拍+线图)</span><span class="toc-en">Locks Tech</span><span class="toc-dots"></span><span class="toc-page">11</span></li>
+                <li class="toc-item"><span class="toc-title" style="color: var(--archie-gold);">09 / 工程小五金 (实拍+线图)</span><span class="toc-en">Hardware Tech</span><span class="toc-dots"></span><span class="toc-page">12</span></li>
+            </ul>
+        </div>
+        <div class="page-footer">- PAGE 07 -</div>
+    </div>
+
+    <!-- ================== PAGE 08: 过渡页 ================== -->
+    <div class="a4-page divider-page">
+        <div class="divider-number">06</div>
+        <h2>智能门控</h2>
+        <p>SMART HARDWARE COLLECTION</p>
+        <div class="divider-line"></div>
+    </div>
+
+    <!-- ================== PAGE 09: 门锁五金 (实拍 6 宫格) ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 门锁五金系列 (实拍)</div></header>
+        <div class="page-content">
+            <div class="grid-6">
+                <!-- 产品 1 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-M102+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">极简磁吸分体锁</div><div class="card-model">AJ-M102-BK</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">优质锌合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">拉丝黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">磁吸静音锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">室内套装门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 2 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-M105+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">现代简约执手锁</div><div class="card-model">AJ-M105-GD</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304不锈钢</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">PVD 钛金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">机械标准锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">商用办公/住宅</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 3 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-S201+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">重型推拉门锁</div><div class="card-model">AJ-S201-SN</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">优质锌合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">砂镍</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">专属钩舌锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">阳台推拉门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 4 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-H305+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">隐形门单面锁</div><div class="card-model">AJ-H305-GY</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">枪灰色</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">单舌隐形锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">背景墙隐形门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 5 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-C402+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">欧式古典分体锁</div><div class="card-model">AJ-C402-AB</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">高纯度黄铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">青古铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">欧标静音锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">星级酒店/别墅</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 6 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/5E4585?text=[+AJ-G501+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">窄边框玻璃门锁</div><div class="card-model">AJ-G501-BK</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">极简哑黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">极窄磁吸锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">铝框玻璃门</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 09 -</div>
+    </div>
+
+    <!-- ================== PAGE 10: 工程小五金 (实拍 6 宫格) ================== -->
+    <div class="a4-page">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 工程小五金系列 (实拍)</div></header>
+        <div class="page-content">
+            <div class="grid-6">
+                <!-- 产品 1 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-HY201+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">重型不锈钢合页</div><div class="card-model">AJ-HY-201</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">不锈钢拉丝</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">4" x 3" x 3.0mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">入户大门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 2 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-HY305+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">隐形门液压合页</div><div class="card-model">AJ-HY-305</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">极简黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">6" x 3" x 3.5mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">背景墙隐形门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 3 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-DX01+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">强磁防撞地吸</div><div class="card-model">AJ-DX-01</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">纯铜 / 强磁</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">PVD 钛金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">Ø45 x 60mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">室内通用木门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 4 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-DX05+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">静音硅胶门吸</div><div class="card-model">AJ-DX-05</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">锌合金 + 硅胶</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">枪灰色</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">50 x 85mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">卧室/书房</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 5 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-CX02+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">隐形天地插销</div><div class="card-model">AJ-CX-02</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304不锈钢</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">拉丝砂镍</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">6寸/8寸/10寸</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">双开门/子母门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 6 -->
+                <div class="product-card">
+                    <div class="card-img-box"><img src="https://placehold.co/400x400/F8F8FA/9A805E?text=[+AJ-AQ01+]" alt="实拍图"></div>
+                    <div class="card-info">
+                        <div class="card-title">纯铜防盗安全扣</div><div class="card-model">AJ-AQ-01</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">高纯度黄铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">青古铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">120 x 25mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">酒店/高档客房</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 10 -</div>
+    </div>
+
+    <!-- ================== PAGE 11: 门锁五金 (复合图解 6 宫格) ================== -->
+    <div class="a4-page composite-mode">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 门锁五金系列 (复合图解)</div></header>
+        <div class="page-content">
+            <div class="grid-6">
+                <!-- 产品 1 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line">
+                            <div class="tech-tag">SCALE 1:1</div>
+                            <img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art" alt="线图">
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">极简磁吸分体锁</div><div class="card-model">AJ-M102-BK</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">优质锌合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">拉丝黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">磁吸静音锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">室内套装门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 2 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line">
+                            <div class="tech-tag">SCALE 1:1</div>
+                            <img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art" alt="线图">
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">现代简约执手锁</div><div class="card-model">AJ-M105-GD</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304不锈钢</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">PVD 钛金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">机械标准锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">商用办公/住宅</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 3 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-03</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">重型推拉门锁</div><div class="card-model">AJ-S201-SN</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">优质锌合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">砂镍</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">专属钩舌锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">阳台推拉门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 4 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-04</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">隐形门单面锁</div><div class="card-model">AJ-H305-GY</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">枪灰色</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">单舌隐形锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">背景墙隐形门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 5 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-05</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">欧式古典分体锁</div><div class="card-model">AJ-C402-AB</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">高纯度黄铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">青古铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">欧标静音锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">星级酒店/别墅</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 6 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/5E4585?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-06</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">窄边框玻璃门锁</div><div class="card-model">AJ-G501-BK</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">极简哑黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">搭配锁体</span><span class="mini-value">极窄磁吸锁体</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">铝框玻璃门</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 11 -</div>
+    </div>
+
+    <!-- ================== PAGE 12: 工程小五金 (复合图解 6 宫格) ================== -->
+    <div class="a4-page composite-mode">
+        <header class="page-header"><div class="header-title">2026 工程产品手册 / 工程小五金系列 (复合图解)</div></header>
+        <div class="page-content">
+            <div class="grid-6">
+                <!-- 产品 1 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line">
+                            <div class="tech-tag">SCALE 1:2</div>
+                            <img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art" alt="线图">
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">重型不锈钢合页</div><div class="card-model">AJ-HY-201</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">不锈钢拉丝</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">4" x 3" x 3.0mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">入户大门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 2 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line">
+                            <div class="tech-tag">SCALE 1:2</div>
+                            <img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art" alt="线图">
+                        </div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">隐形门液压合页</div><div class="card-model">AJ-HY-305</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">航空铝合金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">极简黑</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">6" x 3" x 3.5mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">背景墙隐形门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 3 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-03</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">强磁防撞地吸</div><div class="card-model">AJ-DX-01</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">纯铜 / 强磁</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">PVD 钛金</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">Ø45 x 60mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">室内通用木门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 4 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-04</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">静音硅胶门吸</div><div class="card-model">AJ-DX-05</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">锌合金 + 硅胶</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">枪灰色</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">50 x 85mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">卧室/书房</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 5 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-05</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">隐形天地插销</div><div class="card-model">AJ-CX-02</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">SUS304不锈钢</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">拉丝砂镍</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">6寸/8寸/10寸</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">双开门/子母门</span></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 产品 6 -->
+                <div class="product-card">
+                    <div class="card-img-box">
+                        <div class="composite-photo"><img src="https://placehold.co/300x300/F8F8FA/9A805E?text=Photo" alt="实拍图"></div>
+                        <div class="composite-line"><div class="tech-tag">DWG-06</div><img src="https://placehold.co/200x200/FFFFFF/000000?text=Line+Art"></div>
+                    </div>
+                    <div class="card-info">
+                        <div class="card-title">纯铜防盗安全扣</div><div class="card-model">AJ-AQ-01</div>
+                        <div class="card-specs-mini">
+                            <div class="mini-spec-row"><span class="mini-label">材质</span><span class="mini-value">高纯度黄铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">表面处理</span><span class="mini-value">青古铜</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">规格</span><span class="mini-value">120 x 25mm</span></div>
+                            <div class="mini-spec-row"><span class="mini-label">适用范围</span><span class="mini-value">酒店/高档客房</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="page-footer">- PAGE 12 -</div>
+    </div>
+
+    <!-- ================== PAGE 13: 封底 ================== -->
+    <div class="a4-page back-cover">
+        <h2 style="font-size: 24px; color: #fff; letter-spacing: 12px; margin-bottom: 10px;">ARCHIE</h2>
+        <p style="color: var(--archie-gold); letter-spacing: 8px; font-size: 14px;">雅洁五金</p>
+        <div class="qr-code"><img src="https://placehold.co/200x200/FFFFFF/000000?text=[+二维码+]" alt="二维码"></div>
+        <div class="contact-info">
+            <strong style="color: var(--archie-gold); font-size: 14px; display: block; margin-bottom: 10px; letter-spacing: 3px;">广东雅洁五金有限公司</strong>
+            GUANGDONG ARCHIE HARDWARE CO., LTD.<br><br>
+            全国服务热线：400-888-xxxx<br>
+            官方网站：www.archie.com.cn<br>
+            总部地址：广东省佛山市南海区大沥镇雅洁工业园
+        </div>
+    </div>
+
+</body>
+</html>

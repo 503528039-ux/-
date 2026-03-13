@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据迁移集成测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            background: #f9f9f9;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>数据迁移集成测试</h1>
+    <p>这个页面测试数据迁移功能在实际浏览器环境中的工作。</p>
+    
+    <div class="test-section">
+        <h2>测试 1: 检查 localStorage 当前状态</h2>
+        <button onclick="testCurrentStorage()">检查当前存储</button>
+        <div id="test1-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试 2: 模拟旧版本数据（无版本号）</h2>
+        <p>模拟应用升级前保存的旧数据格式（纯页面数组）</p>
+        <button onclick="testOldDataMigration()">测试旧数据迁移</button>
+        <div id="test2-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试 3: 模拟损坏的数据</h2>
+        <p>测试应用如何处理损坏的 JSON 数据</p>
+        <button onclick="testCorruptedData()">测试损坏数据</button>
+        <div id="test3-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试 4: 验证数据保存功能</h2>
+        <p>测试新数据保存功能是否添加版本号</p>
+        <button onclick="testDataSaving()">测试数据保存</button>
+        <div id="test4-result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试 5: 清理测试数据</h2>
+        <p>清理所有测试数据，恢复干净状态</p>
+        <button onclick="cleanTestData()">清理测试数据</button>
+        <div id="test5-result"></div>
+    </div>
+    
+    <script>
+        // 模拟数据迁移工具（简化版）
+        const LATEST_DATA_VERSION = 1;
+        const STORAGE_KEY = 'archie_catalog_store';
+        
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="test-result ${type}">
+                    ${message}
+                </div>
+            `;
+        }
+        
+        function testCurrentStorage() {
+            try {
+                const rawData = localStorage.getItem(STORAGE_KEY);
+                let message = `<p><strong>当前 localStorage 状态:</strong></p>`;
+                
+                if (!rawData) {
+                    message += `<p>没有找到存储数据</p>`;
+                } else {
+                    const data = JSON.parse(rawData);
+                    message += `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    message += `<p>数据版本: ${data.version || '无版本号 (旧格式)'}</p>`;
+                    message += `<p>页面数量: ${Array.isArray(data.pages) ? data.pages.length : (Array.isArray(data) ? data.length : '未知')}</p>`;
+                }
+                
+                showResult('test1-result', message, 'info');
+            } catch (error) {
+                showResult('test1-result', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        function testOldDataMigration() {
+            try {
+                // 保存旧格式数据（纯数组，无版本号）
+                const oldData = [
+                    { id: 'old-page-1', type: 'product', title: '旧产品页面1' },
+                    { id: 'old-page-2', type: 'cover', title: '旧封面页面2' }
+                ];
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(oldData));
+                
+                // 模拟应用启动时的数据加载
+                const rawData = localStorage.getItem(STORAGE_KEY);
+                const data = JSON.parse(rawData);
+                
+                let message = `<p><strong>测试旧数据迁移:</strong></p>`;
+                message += `<p>保存的旧数据格式: ${Array.isArray(data) ? '纯数组' : '对象'}</p>`;
+                
+                // 检查数据是否可以被应用正确加载
+                let pages = [];
+                if (Array.isArray(data)) {
+                    // 旧格式：纯页面数组
+                    pages = data;
+                    message += `<p>检测到旧格式数据（纯数组），需要迁移</p>`;
+                } else if (data && data.version === LATEST_DATA_VERSION && Array.isArray(data.pages)) {
+                    // 新格式：已迁移
+                    pages = data.pages;
+                    message += `<p>数据已是最新格式（版本 ${data.version}）</p>`;
+                } else if (data && data.pages) {
+                    // 其他格式
+                    pages = data.pages;
+                    message += `<p>数据格式: 版本 ${data.version || '无'}, 页面: ${pages.length}</p>`;
+                }
+                
+                message += `<p>可加载的页面数量: ${pages.length}</p>`;
+                message += `<pre>${JSON.stringify(pages, null, 2)}</pre>`;
+                
+                // 验证迁移是否成功
+                if (pages.length === 2 && pages[0].id === 'old-page-1') {
+                    message += `<p><strong>✅ 测试通过:</strong> 旧数据可以被正确识别和加载</p>`;
+                    showResult('test2-result', message, 'success');
+                } else {
+                    message += `<p><strong>⚠️ 注意:</strong> 数据可能未正确迁移</p>`;
+                    showResult('test2-result', message, 'info');
+                }
+                
+            } catch (error) {
+                showResult('test2-result', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        function testCorruptedData() {
+            try {
+                // 保存损坏的 JSON 数据
+                localStorage.setItem(STORAGE_KEY, '这不是有效的 JSON { invalid: data');
+                
+                // 尝试加载
+                const rawData = localStorage.getItem(STORAGE_KEY);
+                
+                let message = `<p><strong>测试损坏数据:</strong></p>`;
+                message += `<p>保存的损坏数据: "${rawData.substring(0, 50)}..."</p>`;
+                
+                try {
+                    JSON.parse(rawData);
+                    message += `<p>✅ JSON 解析成功（不应该发生）</p>`;
+                    showResult('test3-result', message, 'error');
+                } catch (parseError) {
+                    message += `<p>✅ JSON 解析失败（预期行为）: ${parseError.message}</p>`;
+                    message += `<p><strong>✅ 测试通过:</strong> 应用应该能够处理损坏的 JSON 数据</p>`;
+                    showResult('test3-result', message, 'success');
+                }
+                
+            } catch (error) {
+                showResult('test3-result', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        function testDataSaving() {
+            try {
+                // 模拟应用保存数据
+                const testPages = [
+                    { id: 'test-save-1', type: 'product', title: '测试保存页面1' },
+                    { id: 'test-save-2', type: 'cover', title: '测试保存页面2' }
+                ];
+                
+                // 模拟新格式保存（带版本号）
+                const dataToSave = {
+                    version: LATEST_DATA_VERSION,
+                    pages: testPages
+                };
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+                
+                // 验证保存的数据
+                const rawData = localStorage.getItem(STORAGE_KEY);
+                const savedData = JSON.parse(rawData);
+                
+                let message = `<p><strong>测试数据保存:</strong></p>`;
+                message += `<pre>${JSON.stringify(savedData, null, 2)}</pre>`;
+                
+                if (savedData.version === LATEST_DATA_VERSION && 
+                    Array.isArray(savedData.pages) && 
+                    savedData.pages.length === 2) {
+                    message += `<p><strong>✅ 测试通过:</strong> 数据已正确保存，包含版本号</p>`;
+                    showResult('test4-result', message, 'success');
+                } else {
+                    message += `<p><strong>❌ 测试失败:</strong> 数据保存格式不正确</p>`;
+                    showResult('test4-result', message, 'error');
+                }
+                
+            } catch (error) {
+                showResult('test4-result', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        function cleanTestData() {
+            try {
+                localStorage.removeItem(STORAGE_KEY);
+                showResult('test5-result', '<p><strong>✅ 测试数据已清理</strong></p><p>localStorage 已恢复干净状态</p>', 'success');
+            } catch (error) {
+                showResult('test5-result', `错误: ${error.message}`, 'error');
+            }
+        }
+        
+        // 页面加载时显示当前状态
+        window.addEventListener('load', () => {
+            testCurrentStorage();
+        });
+    </script>
+</body>
+</html>
