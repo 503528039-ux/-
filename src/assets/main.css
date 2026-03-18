@@ -169,7 +169,7 @@ p {
 .hero-img {
     width: calc(100% + var(--page-padding) * 2);
     height: 110mm;
-    background: #000;
+    background: var(--color-image-bg, #f5f5f7);
     margin-left: calc(var(--page-padding) * -1);
     margin-right: calc(var(--page-padding) * -1);
     margin-bottom: 12mm;

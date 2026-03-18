@@ -9,7 +9,11 @@
  * - lineImage 不存在 → standard-mode（单张实拍图）
  */
 import { computed } from 'vue'
+import { useCatalogStore } from '../stores/index'
+import ImageUploader from './ui/ImageUploader.vue'
 import type { Product, SpecItem } from '../data/catalog'
+
+const store = useCatalogStore()
 
 // ===== Props 定义 =====
 const props = defineProps<{
@@ -17,6 +21,10 @@ const props = defineProps<{
   data: Product
   /** 是否为只读模式（打印时自动启用） */
   readonly?: boolean
+  /** 图册页索引，与 productIndex 同时传入时可在卡片内上传/拖拽换图 */
+  pageIndex?: number
+  /** 当前页 items 中的产品下标 */
+  productIndex?: number
 }>()
 
 // ===== Emits 定义 =====
@@ -51,6 +59,132 @@ const specsList = computed<SpecItem[]>(() => {
   return props.data.specs || []
 })
 
+const canEditImages = computed(() => {
+  if (props.readonly) return false
+  const pi = props.pageIndex
+  const idx = props.productIndex
+  return (
+    typeof pi === 'number' &&
+    pi >= 0 &&
+    typeof idx === 'number' &&
+    idx >= 0 &&
+    !store.printMode
+  )
+})
+
+function setProductField(field: 'image' | 'lineImage', src: string | null) {
+  const pi = props.pageIndex
+  const idx = props.productIndex
+  if (typeof pi !== 'number' || typeof idx !== 'number') return
+  const page = store.pages[pi] as { items?: Product[] } | undefined
+  if (page?.items?.[idx]) {
+    ;(page.items[idx] as Record<string, string>)[field] = src || ''
+  }
+}
+
+function getProductItem(): any | null {
+  const pi = props.pageIndex
+  const idx = props.productIndex
+  if (typeof pi !== 'number' || typeof idx !== 'number') return null
+  const page = store.pages[pi] as any
+  const item = page?.items?.[idx]
+  return item || null
+}
+
+type FitMode = 'contain' | 'cover' | 'fill'
+type ImageKind = 'image' | 'line'
+
+function ensureImageTransforms(kind: ImageKind, fallbackFit: FitMode) {
+  const item = getProductItem()
+  if (!item) return
+  const p = kind === 'image' ? 'image' : 'line'
+  const scaleKey = `${p}Scale`
+  const rotKey = `${p}Rotation`
+  const opKey = `${p}Opacity`
+  const fitKey = `${p}Fit`
+  const posKey = `${p}Pos`
+
+  if (item[scaleKey] == null) item[scaleKey] = 1
+  if (item[rotKey] == null) item[rotKey] = 0
+  if (item[opKey] == null) item[opKey] = 1
+  if (item[fitKey] == null) item[fitKey] = fallbackFit
+  if (item[posKey] == null) item[posKey] = '50% 50%'
+}
+
+function getImageTransform(kind: ImageKind, fallbackFit: FitMode) {
+  const item = getProductItem()
+  if (!item) {
+    return {
+      scale: 1,
+      rotation: 0,
+      opacity: 1,
+      fit: fallbackFit,
+      position: '50% 50%'
+    }
+  }
+  ensureImageTransforms(kind, fallbackFit)
+  const p = kind === 'image' ? 'image' : 'line'
+  return {
+    scale: item[`${p}Scale`] ?? 1,
+    rotation: item[`${p}Rotation`] ?? 0,
+    opacity: item[`${p}Opacity`] ?? 1,
+    fit: (item[`${p}Fit`] as FitMode) ?? fallbackFit,
+    position: item[`${p}Pos`] ?? '50% 50%'
+  }
+}
+
+function updateImageScale(kind: ImageKind, delta: number, fallbackFit: FitMode) {
+  const item = getProductItem()
+  if (!item) return
+  ensureImageTransforms(kind, fallbackFit)
+  const p = kind === 'image' ? 'image' : 'line'
+  const key = `${p}Scale`
+  const next = (item[key] ?? 1) + delta
+  item[key] = Math.min(1.5, Math.max(0.5, next))
+}
+
+function updateImageRotation(kind: ImageKind, delta: number, fallbackFit: FitMode) {
+  const item = getProductItem()
+  if (!item) return
+  ensureImageTransforms(kind, fallbackFit)
+  const p = kind === 'image' ? 'image' : 'line'
+  const key = `${p}Rotation`
+  item[key] = ((item[key] ?? 0) + delta) % 360
+}
+
+function updateImageOpacity(kind: ImageKind, delta: number, fallbackFit: FitMode) {
+  const item = getProductItem()
+  if (!item) return
+  ensureImageTransforms(kind, fallbackFit)
+  const p = kind === 'image' ? 'image' : 'line'
+  const key = `${p}Opacity`
+  const next = (item[key] ?? 1) + delta
+  item[key] = Math.min(1, Math.max(0.4, next))
+}
+
+function cycleFit(field: 'imageFit' | 'lineFit') {
+  const item = getProductItem()
+  if (!item) return
+  const cur = item[field] || 'contain'
+  const next = cur === 'cover' ? 'contain' : cur === 'contain' ? 'fill' : 'cover'
+  item[field] = next
+}
+
+function imageStyle(img: { scale?: number; opacity?: number; rotation?: number; fit?: string; position?: string } | null | undefined, fallbackFit: FitMode = 'contain') {
+  if (!img) return {}
+  const scale = img.scale ?? 1
+  const rotation = img.rotation ?? 0
+  const opacity = img.opacity ?? 1
+  const fit = (img.fit as any) || fallbackFit
+  const position = img.position || '50% 50%'
+  return {
+    transform: `scale(${scale}) rotate(${rotation}deg)`,
+    opacity,
+    objectFit: fit,
+    objectPosition: position
+  }
+}
+
 // ===== 方法 =====
 function handleClick() {
   emit('click', props.data)
@@ -72,9 +206,24 @@ function handleClick() {
         :src="data.image"
         :alt="data.name"
         class="product-img"
+        :style="imageStyle(getImageTransform('image', 'contain'), 'contain')"
       >
       <div v-else class="image-placeholder">
         <span class="placeholder-text">{{ data.model }}</span>
+      </div>
+      <ImageUploader
+        v-if="canEditImages"
+        :has-image="hasImage"
+        @update:src="(src) => setProductField('image', src)"
+      />
+      <div v-if="canEditImages && hasImage" class="img-tools">
+        <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
+        <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
+        <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
+        <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
+        <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
+        <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
+        <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
       </div>
     </div>
 
@@ -89,9 +238,24 @@ function handleClick() {
           v-if="hasImage"
           :src="data.image"
           :alt="data.name"
+          :style="imageStyle(getImageTransform('image', 'contain'), 'contain')"
         >
         <div v-else class="image-placeholder mini">
           <span class="placeholder-text">实拍图</span>
+        </div>
+        <ImageUploader
+          v-if="canEditImages"
+          :has-image="hasImage"
+          @update:src="(src) => setProductField('image', src)"
+        />
+        <div v-if="canEditImages && hasImage" class="img-tools">
+          <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
+          <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
+          <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
+          <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
+          <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
+          <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
+          <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
         </div>
       </div>
 
@@ -104,9 +268,24 @@ function handleClick() {
           v-if="hasLineImage"
           :src="data.lineImage"
           :alt="`${data.name} 线图`"
+          :style="imageStyle(getImageTransform('line', 'contain'), 'contain')"
         >
         <div v-else class="image-placeholder mini">
           <span class="placeholder-text">线图</span>
+        </div>
+        <ImageUploader
+          v-if="canEditImages"
+          :has-image="hasLineImage"
+          @update:src="(src) => setProductField('lineImage', src)"
+        />
+        <div v-if="canEditImages && hasLineImage" class="img-tools">
+          <button type="button" @click.stop="updateImageScale('line', 0.1, 'contain')">＋</button>
+          <button type="button" @click.stop="updateImageScale('line', -0.1, 'contain')">－</button>
+          <button type="button" @click.stop="updateImageRotation('line', -5, 'contain')">↺</button>
+          <button type="button" @click.stop="updateImageRotation('line', 5, 'contain')">↻</button>
+          <button type="button" @click.stop="updateImageOpacity('line', -0.1, 'contain')">淡</button>
+          <button type="button" @click.stop="updateImageOpacity('line', 0.1, 'contain')">浓</button>
+          <button type="button" @click.stop="cycleFit('lineFit')">适配</button>
         </div>
       </div>
     </div>
@@ -163,10 +342,28 @@ function handleClick() {
   overflow: hidden;
 }
 
+.img-tools {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  z-index: 20;
+  display: flex;
+}
+
+.img-tools button {
+  border: none;
+  padding: 0 4px;
+  font-size: 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+}
+
 /* ===== 标准模式样式 ===== */
 .card-img-box.standard-mode {
   /* 浅灰色背景 */
-  background-color: rgba(134, 134, 139, 0.04);
+  background-color: var(--color-image-bg, #f5f5f7);
   padding: 10mm;
 }
 

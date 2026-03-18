@@ -6,60 +6,83 @@ import ImageUploader from '../ui/ImageUploader.vue'
 import EditableText from '../ui/EditableText.vue'
 
 const props = defineProps({
-  /** 页面在 store.pages 中的索引 */
   pageIndex: {
     type: Number,
     required: true
   }
 })
 
-// ===== Store 初始化 =====
 const store = useCatalogStore()
 
-// ===== 计算属性 =====
+const pageData = computed(() => store.pages[props.pageIndex] || {})
+const displayTitle = computed(() => pageData.value.title || '战略合作伙伴')
+const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Global Partners')
+const partnersList = computed(() => pageData.value.items || [])
+const hasData = computed(() => partnersList.value.length > 0)
+const totalPages = computed(() => store.pages.length)
 
-/** 当前页面数据 */
-const pageData = computed(() => {
-  return store.pages[props.pageIndex] || {}
-})
-
-/** 页面标题 */
-const displayTitle = computed(() => {
-  return pageData.value.title || '战略合作伙伴'
-})
-
-/** 页面副标题 */
-const displaySubtitle = computed(() => {
-  return pageData.value.sub || pageData.value.subtitle || 'Global Partners'
-})
-
-/** 合作伙伴数据 */
-const partnersList = computed(() => {
-  return pageData.value.items || []
-})
-
-/** 是否有数据 */
-const hasData = computed(() => {
-  return partnersList.value.length > 0
-})
-
-/** 总页数 */
-const totalPages = computed(() => {
-  return store.pages.length
-})
-
-// 页眉右上角统一标题
-const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
-
-function getPartnerLogo(partner) {
-  const text = partner?.name ? String(partner.name) : 'LOGO'
-  return `https://placehold.co/240x120/F8F8FA/86868B?text=${encodeURIComponent(text)}`
-}
+/** 与 HTML PAGE 04 一致 */
+const headerTitle = '2026 工程产品手册 / 战略合作伙伴'
 
 function updatePartnerImage(index, src) {
   if (!Array.isArray(pageData.value.items)) return
   if (!pageData.value.items[index]) return
-  pageData.value.items[index].image = src
+  pageData.value.items[index].image = src || ''
+}
+
+function partnerImageStyle(partner) {
+  if (!partner) return {}
+  const scale = partner.scale ?? 1
+  const rotation = partner.rotation ?? 0
+  const opacity = partner.opacity ?? 1
+  const fit = partner.fit || 'contain'
+  const position = partner.position || '50% 50%'
+  return {
+    transform: `scale(${scale}) rotate(${rotation}deg)`,
+    opacity,
+    objectFit: fit,
+    objectPosition: position
+  }
+}
+
+function ensurePartner(index) {
+  const items = pageData.value.items
+  if (!Array.isArray(items) || !items[index]) return null
+  const p = items[index]
+  if (p.scale == null) p.scale = 1
+  if (p.opacity == null) p.opacity = 1
+  if (p.rotation == null) p.rotation = 0
+  if (p.fit == null) p.fit = 'contain'
+  if (p.position == null) p.position = '50% 50%'
+  return p
+}
+
+function updatePartnerScale(index, delta) {
+  const p = ensurePartner(index)
+  if (!p) return
+  const next = (p.scale ?? 1) + delta
+  p.scale = Math.min(1.5, Math.max(0.5, next))
+}
+
+function updatePartnerRotation(index, delta) {
+  const p = ensurePartner(index)
+  if (!p) return
+  p.rotation = ((p.rotation ?? 0) + delta) % 360
+}
+
+function updatePartnerOpacity(index, delta) {
+  const p = ensurePartner(index)
+  if (!p) return
+  const next = (p.opacity ?? 1) + delta
+  p.opacity = Math.min(1, Math.max(0.4, next))
+}
+
+function cyclePartnerFit(index) {
+  const p = ensurePartner(index)
+  if (!p) return
+  const cur = p.fit || 'contain'
+  const next = cur === 'cover' ? 'contain' : cur === 'contain' ? 'fill' : 'cover'
+  p.fit = next
 }
 
 function updateTitle(val) {
@@ -85,79 +108,120 @@ function updatePartnerName(index, val) {
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
-    :showHeader="true"
-    :showFooter="true"
+    :show-header="true"
+    :show-footer="true"
   >
-    <div class="content-section">
-      <EditableText tag="h2" className="section-title" :value="displayTitle" @update:value="updateTitle" />
-      <EditableText tag="p" className="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
-      
-      <!-- 合作伙伴介绍 -->
-      <div 
-        class="partners-intro"
-        :style="{
-          fontSize: '12px',
-          color: 'var(--color-text-dark)',
-          lineHeight: '1.8',
-          marginBottom: 'var(--spacing-xl)',
-          textAlign: 'justify'
-        }"
-      >
-        <p>雅洁五金与全球顶尖房地产开发商、酒店集团、设计机构建立了长期战略合作关系。我们为合作伙伴提供定制化的五金解决方案，从产品设计到安装维护，全程提供专业支持。</p>
-      </div>
-      
-      <!-- 3x5 合作伙伴网格 -->
-      <div 
-        v-if="hasData"
-        class="grid-partner"
-      >
-        <div 
-          v-for="(partner, idx) in partnersList" 
-          :key="partner.id || idx"
-          class="partner-box"
-        >
-           <div class="partner-logo-wrap">
-            <img :src="partner.image || getPartnerLogo(partner)" alt="合作伙伴logo" class="partner-logo-img" />
-            <ImageUploader @update:src="(src) => updatePartnerImage(idx, src)" />
-           </div>
-           <EditableText tag="div" className="partner-name" style="font-weight: 700; color: #1d1d1f; text-align: center;" :value="partner.name || ''" @update:value="(v) => updatePartnerName(idx, v)" />
-           <div v-if="partner.desc" class="partner-desc" style="font-size: 10px; color: #86868b; margin-top: 4px;">{{ partner.desc }}</div>
-        </div>
-      </div>
+    <EditableText tag="h2" class-name="section-title" :value="displayTitle" @update:value="updateTitle" />
+    <EditableText tag="div" class-name="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
 
-      <!-- 空状态 -->
-      <div v-else class="empty-state">
-        <div class="empty-icon">🤝</div>
-        <p class="empty-text">暂无合作伙伴数据</p>
-        <p class="empty-hint">请在侧边栏添加合作伙伴或从 Excel 导入</p>
+    <div v-if="hasData" class="grid-partner">
+      <div
+        v-for="(partner, idx) in partnersList"
+        :key="partner.id || idx"
+        class="partner-box"
+      >
+        <div v-if="partner.image" class="partner-logo-wrap">
+          <img
+            :src="partner.image"
+            alt=""
+            class="partner-logo-img"
+            :style="partnerImageStyle(partner)"
+          />
+          <ImageUploader
+            :has-image="true"
+            @update:src="(src) => updatePartnerImage(idx, src)"
+          />
+          <div class="img-tools">
+            <button type="button" @click.stop="updatePartnerScale(idx, 0.1)">＋</button>
+            <button type="button" @click.stop="updatePartnerScale(idx, -0.1)">－</button>
+            <button type="button" @click.stop="updatePartnerRotation(idx, -5)">↺</button>
+            <button type="button" @click.stop="updatePartnerRotation(idx, 5)">↻</button>
+            <button type="button" @click.stop="updatePartnerOpacity(idx, -0.1)">淡</button>
+            <button type="button" @click.stop="updatePartnerOpacity(idx, 0.1)">浓</button>
+            <button type="button" @click.stop="cyclePartnerFit(idx)">适配</button>
+          </div>
+        </div>
+        <div v-else class="partner-upload-slot">
+          <ImageUploader
+            :has-image="false"
+            @update:src="(src) => updatePartnerImage(idx, src)"
+          />
+        </div>
+        <EditableText
+          tag="div"
+          class-name="partner-name-text"
+          :value="partner.name || ''"
+          @update:value="(v) => updatePartnerName(idx, v)"
+        />
       </div>
+    </div>
+
+    <div v-else class="empty-state">
+      <div class="empty-icon">🤝</div>
+      <p class="empty-text">暂无合作伙伴数据</p>
+      <p class="empty-hint">请在侧边栏插入「战略合作伙伴」页</p>
     </div>
   </A4Page>
 </template>
 
 <style scoped>
-.content-section {
-  padding: 0 var(--page-padding);
+/* 与 HTML：3×5，35mm 高，奶油底，文案居中 */
+.partner-logo-wrap {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28%;
+  max-height: 12mm;
+  z-index: 1;
 }
 
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-archie-purple);
-  margin-bottom: var(--spacing-xs);
-  text-transform: uppercase;
-  letter-spacing: 2px;
+.partner-logo-img {
+  width: 100%;
+  height: 100%;
+  max-height: 12mm;
+  object-fit: contain;
 }
 
-.section-subtitle {
-  font-size: 14px;
-  color: var(--color-archie-gold);
-  margin-bottom: var(--spacing-lg);
-  letter-spacing: 1px;
-  font-weight: 500;
+.partner-upload-slot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  opacity: 0.35;
+  z-index: 1;
 }
 
-/* 空状态 */
+.img-tools {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 20;
+}
+
+.img-tools button {
+  border: none;
+  padding: 0 3px;
+  font-size: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+}
+
+:deep(.partner-name-text) {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray, #86868b);
+  text-align: center;
+  padding: 0 6px;
+  line-height: 1.25;
+  max-width: 100%;
+  word-break: break-all;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -175,37 +239,21 @@ function updatePartnerName(index, val) {
   font-size: 48px;
   opacity: 0.5;
 }
-
 .empty-text {
   font-size: 18px;
   font-weight: 600;
   color: #1d1d1f;
 }
-
 .empty-hint {
   font-size: 14px;
   color: #86868b;
 }
 
-.partner-logo-wrap {
-  position: relative;
-  width: 100%;
-  height: 14mm;
-  margin-bottom: 6px;
-  border-radius: 5px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.partner-logo-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  opacity: 0.9;
-}
-
 @media print {
   .empty-state {
+    display: none;
+  }
+  .partner-upload-slot {
     display: none;
   }
 }

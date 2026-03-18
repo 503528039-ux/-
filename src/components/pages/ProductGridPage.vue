@@ -65,9 +65,11 @@ const hasProducts = computed(() => {
     <!-- ===== 六宫格产品网格 ===== -->
     <div v-if="hasProducts" class="grid-6">
       <ProductCard
-        v-for="product in productsList"
-        :key="product.id || Math.random()"
+        v-for="(product, idx) in productsList"
+        :key="product.id || idx"
         :data="product"
+        :page-index="props.pageIndex"
+        :product-index="idx"
       />
     </div>
 

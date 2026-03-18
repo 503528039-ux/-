@@ -5,6 +5,8 @@ import A4Page from '../layout/A4Page.vue'
 import EditableText from '../ui/EditableText.vue'
 import ImageUploader from '../ui/ImageUploader.vue'
 
+const GRID_COUNT = 9
+
 const props = defineProps({
   pageIndex: { type: Number, required: true }
 })
@@ -15,14 +17,14 @@ const pageData = computed(() => store.pages[props.pageIndex] || {})
 const displayTitle = computed(() => pageData.value.title || '筑造地标')
 const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Engineering Cases')
 const casesList = computed(() => pageData.value.items || [])
-const hasData = computed(() => casesList.value.length > 0)
 const totalPages = computed(() => store.pages.length)
 
-// 页眉右上角统一标题
-const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
+/** 页眉与《最新页面代码.html》PAGE 05 一致 */
+const headerTitle = '2026 工程产品手册 / 经典工程案例'
 
-const topCase = computed(() => casesList.value[0] || { image: '', category: 'COMMERCIAL COMPLEX', name: '上海中心大厦', en: 'Shanghai Tower' })
-const bottomCase = computed(() => casesList.value[1] || { image: '', category: 'RESORT HOTEL', name: '三亚海棠湾洲际度假酒店', en: 'IHG Resort' })
+function caseAt(index) {
+  return casesList.value[index] || null
+}
 
 function updateTitle(val) {
   const page = store.pages[props.pageIndex]
@@ -30,20 +32,50 @@ function updateTitle(val) {
 }
 function updateSubtitle(val) {
   const page = store.pages[props.pageIndex]
-  if (page) { page.sub = val; page.subtitle = val }
+  if (page) {
+    page.sub = val
+    page.subtitle = val
+  }
 }
 function ensureItem(index) {
   const page = store.pages[props.pageIndex]
   if (!page) return
   if (!Array.isArray(page.items)) page.items = []
   while (page.items.length <= index) {
-    page.items.push({ id: `auto-${page.items.length}`, category: '', name: '', en: '', image: '' })
+    page.items.push({
+      id: `case-${page.items.length}-${Date.now()}`,
+      category: '',
+      name: '',
+      en: '',
+      image: '',
+      scale: 1,
+      opacity: 1,
+      rotation: 0,
+      fit: 'cover',
+      position: '50% 50%'
+    })
+  }
+}
+
+function imageStyle(item) {
+  if (!item) return {}
+  const scale = item.scale ?? 1
+  const rotation = item.rotation ?? 0
+  const opacity = item.opacity ?? 1
+  const fit = item.fit || 'cover'
+  const position = item.position || '50% 50%'
+  return {
+    transform: `scale(${scale}) rotate(${rotation}deg)`,
+    opacity,
+    objectFit: fit,
+    objectPosition: position
   }
 }
 function updateCaseImage(index, src) {
   ensureItem(index)
   const page = store.pages[props.pageIndex]
-  if (page?.items?.[index]) page.items[index].image = src
+  if (!page?.items?.[index]) return
+  page.items[index].image = src || ''
 }
 function updateCaseCategory(index, val) {
   ensureItem(index)
@@ -53,12 +85,54 @@ function updateCaseCategory(index, val) {
 function updateCaseName(index, val) {
   ensureItem(index)
   const page = store.pages[props.pageIndex]
-  if (page?.items?.[index]) { page.items[index].name = val; page.items[index].title = val }
+  if (page?.items?.[index]) {
+    page.items[index].name = val
+    page.items[index].title = val
+  }
 }
 function updateCaseEn(index, val) {
   ensureItem(index)
   const page = store.pages[props.pageIndex]
-  if (page?.items?.[index]) { page.items[index].en = val; page.items[index].enTitle = val }
+  if (page?.items?.[index]) {
+    page.items[index].en = val
+    page.items[index].enTitle = val
+  }
+}
+
+function updateCaseScale(index, delta) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  const item = page?.items?.[index]
+  if (!item) return
+  const next = (item.scale ?? 1) + delta
+  item.scale = Math.min(1.5, Math.max(0.5, next))
+}
+
+function updateCaseRotation(index, delta) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  const item = page?.items?.[index]
+  if (!item) return
+  item.rotation = ((item.rotation ?? 0) + delta) % 360
+}
+
+function updateCaseOpacity(index, delta) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  const item = page?.items?.[index]
+  if (!item) return
+  const next = (item.opacity ?? 1) + delta
+  item.opacity = Math.min(1, Math.max(0.4, next))
+}
+
+function cycleCaseFit(index) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  const item = page?.items?.[index]
+  if (!item) return
+  const cur = item.fit || 'cover'
+  const next = cur === 'cover' ? 'contain' : cur === 'contain' ? 'fill' : 'cover'
+  item.fit = next
 }
 </script>
 
@@ -67,187 +141,156 @@ function updateCaseEn(index, val) {
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
-    :showHeader="true"
-    :showFooter="true"
+    :show-header="true"
+    :show-footer="true"
   >
-    <div class="content-section-header">
-      <EditableText tag="h2" className="section-title" :value="displayTitle" @update:value="updateTitle" />
-      <EditableText tag="p" className="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
-    </div>
+    <EditableText tag="h2" class="section-title" :value="displayTitle" @update:value="updateTitle" />
+    <EditableText tag="div" class="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
 
-    <div v-if="hasData" class="cases-container">
-      <!-- 上半案例 -->
-      <div class="case-item">
-        <div class="case-image-box">
-          <img v-if="topCase.image" :src="topCase.image" class="case-img" alt="工程案例图片" />
-          <div v-else class="case-placeholder">
-            <div class="placeholder-icon">🏗️</div>
-            <div class="placeholder-text">案例图待上传</div>
+    <div class="grid-cases-3x3">
+      <div
+        v-for="idx in GRID_COUNT"
+        :key="idx - 1"
+        class="case-grid-cell"
+      >
+        <div class="case-grid-photo">
+          <img
+            v-if="caseAt(idx - 1)?.image"
+            :src="caseAt(idx - 1).image"
+            alt=""
+            class="case-grid-img"
+            :style="imageStyle(caseAt(idx - 1))"
+          />
+          <div v-else class="case-grid-placeholder">
+            <span>上传案例图</span>
           </div>
-          <ImageUploader @update:src="(src) => updateCaseImage(0, src)" />
-          <div class="case-overlay"></div>
-        </div>
-        <div class="case-caption">
-          <EditableText tag="span" className="case-category" :value="topCase.category || ''" @update:value="(v) => updateCaseCategory(0, v)" />
-          <EditableText tag="h3" className="case-title-cn" :value="topCase.name || ''" @update:value="(v) => updateCaseName(0, v)" />
-          <EditableText tag="p" className="case-title-en" :value="topCase.en || topCase.enTitle || ''" @update:value="(v) => updateCaseEn(0, v)" />
-        </div>
-      </div>
-
-      <!-- 下半案例 -->
-      <div class="case-item">
-        <div class="case-image-box">
-          <img v-if="bottomCase.image" :src="bottomCase.image" class="case-img" alt="工程案例图片" />
-          <div v-else class="case-placeholder">
-            <div class="placeholder-icon">🏨</div>
-            <div class="placeholder-text">案例图待上传</div>
+          <ImageUploader
+            :has-image="!!caseAt(idx - 1)?.image"
+            @update:src="(src) => updateCaseImage(idx - 1, src)"
+          />
+          <div class="img-tools">
+            <button type="button" @click.stop="updateCaseScale(idx - 1, 0.1)">＋</button>
+            <button type="button" @click.stop="updateCaseScale(idx - 1, -0.1)">－</button>
+            <button type="button" @click.stop="updateCaseRotation(idx - 1, -5)">↺</button>
+            <button type="button" @click.stop="updateCaseRotation(idx - 1, 5)">↻</button>
+            <button type="button" @click.stop="updateCaseOpacity(idx - 1, -0.1)">淡</button>
+            <button type="button" @click.stop="updateCaseOpacity(idx - 1, 0.1)">浓</button>
+            <button type="button" @click.stop="cycleCaseFit(idx - 1)">适配</button>
           </div>
-          <ImageUploader @update:src="(src) => updateCaseImage(1, src)" />
-          <div class="case-overlay"></div>
         </div>
-        <div class="case-caption">
-          <EditableText tag="span" className="case-category" :value="bottomCase.category || ''" @update:value="(v) => updateCaseCategory(1, v)" />
-          <EditableText tag="h3" className="case-title-cn" :value="bottomCase.name || ''" @update:value="(v) => updateCaseName(1, v)" />
-          <EditableText tag="p" className="case-title-en" :value="bottomCase.en || bottomCase.enTitle || ''" @update:value="(v) => updateCaseEn(1, v)" />
-        </div>
+        <EditableText
+          tag="h3"
+          class-name="case-grid-title-cn"
+          :value="caseAt(idx - 1)?.name || ''"
+          @update:value="(v) => updateCaseName(idx - 1, v)"
+        />
+        <EditableText
+          tag="p"
+          class-name="case-grid-title-en"
+          :value="caseAt(idx - 1)?.en || caseAt(idx - 1)?.enTitle || ''"
+          @update:value="(v) => updateCaseEn(idx - 1, v)"
+        />
       </div>
-    </div>
-
-    <div v-else class="empty-state">
-      <div class="empty-icon">🏗️</div>
-      <p class="empty-text">暂无工程案例数据</p>
-      <p class="empty-hint">请在侧边栏添加工程案例项或从 Excel 导入</p>
     </div>
   </A4Page>
 </template>
 
 <style scoped>
-.content-section-header {
-  padding: 0 var(--size-page-padding);
-  margin-bottom: var(--spacing-md);
+/* 收紧标题与网格的垂直间距，减少红框留白 */
+:deep(.section-title) {
+  margin-bottom: 3mm;
 }
 
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-archie-purple);
-  margin-bottom: var(--spacing-xs);
-  letter-spacing: 2px;
+:deep(.section-subtitle) {
+  margin-bottom: 5mm;
 }
 
-.section-subtitle {
-  font-size: 14px;
-  color: var(--color-archie-gold);
-  margin-bottom: 0;
-  letter-spacing: 1px;
-  font-weight: 500;
+/* 与 HTML PAGE 05：3×3，gap 6mm 5mm，图高 60mm */
+.grid-cases-3x3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 6mm 5mm;
+  margin-top: 0;
+  flex: 1;
+  padding-bottom: 10mm;
+  min-height: 0;
 }
 
-.cases-container {
+.case-grid-cell {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  margin-left: calc(var(--size-page-padding) * -1);
-  margin-right: calc(var(--size-page-padding) * -1);
-  gap: 0;
+  min-width: 0;
 }
 
-.case-item {
-  flex: 1;
+.case-grid-photo {
+  width: 100%;
+  height: 60mm;
   position: relative;
   overflow: hidden;
-}
-
-.case-image-box {
-  width: 100%;
-  height: 100%;
-  position: relative;
-}
-
-.case-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.case-overlay {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 60%;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
-  pointer-events: none;
-}
-
-.case-caption {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 15mm;
-  z-index: 2;
-}
-
-.case-category {
-  display: block;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 2px;
-  color: var(--color-archie-gold);
-  text-transform: uppercase;
+  /* 统一使用全局浅灰底色，而不是纯黑块 */
+  background: var(--color-image-bg, #f5f5f7);
   margin-bottom: 6px;
 }
 
-.case-title-cn {
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-  margin: 0 0 4px 0;
-  line-height: 1.2;
+.case-grid-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.85;
 }
 
-.case-title-en {
+.img-tools {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 2px;
+  z-index: 20;
+}
+
+.img-tools button {
+  border: none;
+  padding: 0 4px;
+  font-size: 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+}
+
+.case-grid-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #86868b;
+  background: transparent;
+}
+
+/* 取消左上角分类角标（COMMERCIAL/HOTEL/OFFICE） */
+
+:deep(.case-grid-title-cn) {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
+  margin: 0 0 2px 0;
+  color: var(--text-dark, #1d1d1f);
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 700;
+}
+
+:deep(.case-grid-title-en) {
+  font-size: 8px;
+  color: var(--text-gray, #86868b);
   margin: 0;
   font-family: 'Inter', sans-serif;
 }
 
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 60px;
-  gap: 16px;
-  background-color: #f8f8fa;
-  border-radius: 12px;
-  border: 2px dashed #e5e5e7;
-  margin: 40px;
-  flex: 1;
-}
-
-.empty-icon { font-size: 64px; opacity: 0.5; }
-.empty-text { font-size: 20px; font-weight: 600; color: #1d1d1f; }
-.empty-hint { font-size: 14px; color: #86868b; }
-
-.case-placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(to bottom, #E8E8EA 0%, #2C2C2C 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.placeholder-icon { font-size: 40px; opacity: 0.3; }
-.placeholder-text { font-size: 12px; color: #86868b; }
-
 @media print {
-  .cases-container { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .empty-state { display: none; }
+  .case-grid-photo {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
 </style>

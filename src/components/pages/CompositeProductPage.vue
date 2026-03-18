@@ -27,9 +27,11 @@ const displayTitle = computed(() => {
   <A4Page :page-title="displayTitle" :page-number="props.pageIndex + 1">
     <div v-if="hasProducts" class="grid-6">
       <ProductCard
-        v-for="product in productsList"
-        :key="product.id || Math.random()"
+        v-for="(product, idx) in productsList"
+        :key="product.id || idx"
         :data="product"
+        :page-index="props.pageIndex"
+        :product-index="idx"
       />
     </div>
 

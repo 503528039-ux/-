@@ -13,8 +13,14 @@ const pageData = computed(() => store.pages[props.pageIndex] || {})
 
 const displayTitle = computed(() => pageData.value.title || '质感美学')
 const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Surface Finishes')
-const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
+const headerTitle = '2026 工程产品手册 / 表面处理工艺'
 const totalPages = computed(() => store.pages.length)
+
+const intro = computed(
+  () =>
+    pageData.value.intro ||
+    '雅洁五金拥有行业顶级的无尘电镀及 PVD 真空镀膜生产线。通过数十道严苛的表面处理工艺，为五金产品赋予极具层次感的光影美学。'
+)
 
 const finishes = computed(() => pageData.value.items || [])
 
@@ -37,179 +43,45 @@ function updateSubtitle(val) {
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
-    :showHeader="true"
-    :showFooter="true"
+    :show-header="true"
+    :show-footer="true"
   >
-    <div class="content-section">
-      <EditableText tag="h2" className="section-title" :value="displayTitle" @update:value="updateTitle" />
-      <EditableText tag="p" className="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
-      
-      <!-- 表面处理介绍 -->
-      <div 
-        class="finishes-intro"
-        :style="{
-          fontSize: '12px',
-          color: 'var(--color-text-dark)',
-          lineHeight: '1.8',
-          marginBottom: 'var(--spacing-xl)',
-          textAlign: 'justify'
-        }"
-      >
-        <p>雅洁五金提供六种高端表面处理工艺，每种工艺都经过严格测试，确保色彩持久、质感卓越。我们的表面处理不仅美观，更具备优异的耐磨、耐腐蚀性能。</p>
+    <EditableText tag="h2" class="section-title" :value="displayTitle" @update:value="updateTitle" />
+    <EditableText tag="div" class="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
+
+    <p class="finishes-intro-p">{{ intro }}</p>
+
+    <div v-if="finishes.length" class="grid-finishes">
+      <div v-for="finish in finishes" :key="finish.id" class="finish-item">
+        <div
+          class="finish-swatch"
+          :class="finish.colorClass || 'swatch-pvd'"
+        />
+        <div class="finish-name">{{ finish.name }}</div>
+        <div class="finish-en">{{ finish.en || finish.enName }}</div>
       </div>
-      
-      <!-- 一行6个的表面处理网格 -->
-      <div 
-        class="finishes-grid"
-        :style="{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(6, 1fr)',
-          gap: '10mm 4mm',
-          marginTop: 'var(--spacing-lg)'
-        }"
-      >
-        <div 
-          v-for="finish in finishes" 
-          :key="finish.id"
-          class="finish-item"
-          :style="{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            textAlign: 'center'
-          }"
-        >
-          <!-- 表面处理色板圆环 -->
-          <div 
-            class="finish-swatch"
-            :style="{
-              width: '22mm',
-              height: '22mm',
-              borderRadius: '50%',
-              marginBottom: '12px',
-              boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.15), 0 8px 16px rgba(0,0,0,0.08)',
-              background: finish.gradient,
-              border: finish.colorClass === 'swatch-white' ? '1px solid var(--color-divider)' : 'none'
-            }"
-          >
-            <!-- 内部装饰圆环 -->
-            <div 
-              class="swatch-inner-ring"
-              :style="{
-                width: '16mm',
-                height: '16mm',
-                borderRadius: '50%',
-                position: 'relative',
-                top: '3mm',
-                left: '3mm',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                border: '1px solid rgba(255, 255, 255, 0.2)'
-              }"
-            />
-          </div>
-          
-          <!-- 表面处理名称 -->
-          <h3 
-            class="finish-name"
-            :style="{
-              fontSize: '11px',
-              fontWeight: '700',
-              color: 'var(--color-text-dark)',
-              marginBottom: '3px',
-              lineHeight: '1.2'
-            }"
-          >
-            {{ finish.name }}
-          </h3>
-          
-          <!-- 英文名称 -->
-          <div
-            class="finish-en"
-            :style="{
-              fontSize: '8px',
-              color: 'var(--color-text-gray)',
-              fontFamily: 'Inter, sans-serif',
-              textTransform: 'uppercase',
-              letterSpacing: '0.2px',
-              lineHeight: '1.1',
-              marginBottom: 'var(--spacing-xs)'
-            }"
-          >
-            {{ finish.en || finish.enName }}
-          </div>
-          
-          <!-- 工艺描述 -->
-          <div 
-            class="finish-description"
-            :style="{
-              fontSize: '7px',
-              color: 'var(--color-text-gray)',
-              lineHeight: '1.3',
-              marginTop: 'var(--spacing-xs)',
-              maxWidth: '20mm'
-            }"
-          >
-            {{ finish.description }}
-          </div>
-        </div>
-      </div>
-      
     </div>
 
-    <!-- 页脚插槽内容 -->
-    <template #footer>
-      <PageFooter
-        :pageNumber="pageNumber"
-        :totalPages="totalPages"
-        align="center"
-        :showBorder="false"
-      />
-    </template>
+    <div v-else class="empty-finishes">暂无表面处理数据，请重新插入该页或从模板恢复。</div>
   </A4Page>
 </template>
 
 <style scoped>
-.content-section {
-  padding: 0 var(--size-page-padding);
+.finishes-intro-p {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 0 0 8mm 0;
+  max-width: 90%;
+  color: var(--text-dark, #1d1d1f);
 }
 
-.section-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-archie-purple);
-  margin-bottom: var(--spacing-xs);
-  text-transform: uppercase;
-  letter-spacing: 2px;
+.empty-finishes {
+  margin-top: 20mm;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-gray, #86868b);
+  font-size: 13px;
 }
 
-.section-subtitle {
-  font-size: 14px;
-  color: var(--color-archie-gold);
-  margin-bottom: var(--spacing-lg);
-  letter-spacing: 1px;
-  font-weight: 500;
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .finishes-grid {
-    grid-template-columns: repeat(3, 1fr) !important;
-    gap: var(--spacing-md) !important;
-  }
-  
-  .finishes-features {
-    grid-template-columns: repeat(1, 1fr) !important;
-  }
-}
-
-/* 打印优化 */
-@media print {
-  .finish-swatch {
-    box-shadow: inset 0 1px 4px rgba(0,0,0,0.1), 0 4px 8px rgba(0,0,0,0.05) !important;
-  }
-  
-  .finishes-footer {
-    border: 1px solid var(--color-divider) !important;
-  }
-}
+/* grid-finishes / finish-swatch / swatch-* 定义在 main.css，与 HTML PAGE 06 一致 */
 </style>
