@@ -48,6 +48,9 @@ const totalPages = computed(() => {
   return store.pages.length
 })
 
+// 页眉右上角统一标题
+const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
+
 function getPartnerLogo(partner) {
   const text = partner?.name ? String(partner.name) : 'LOGO'
   return `https://placehold.co/240x120/F8F8FA/86868B?text=${encodeURIComponent(text)}`
@@ -79,9 +82,9 @@ function updatePartnerName(index, val) {
 
 <template>
   <A4Page
-    :title="displayTitle"
-    :pageNumber="props.pageIndex + 1"
-    :totalPages="totalPages"
+    :page-title="headerTitle"
+    :page-number="props.pageIndex + 1"
+    :total-pages="totalPages"
     :showHeader="true"
     :showFooter="true"
   >
@@ -199,13 +202,6 @@ function updatePartnerName(index, val) {
   height: 100%;
   object-fit: contain;
   opacity: 0.9;
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .grid-partner {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
 }
 
 @media print {

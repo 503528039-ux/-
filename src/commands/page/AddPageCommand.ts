@@ -84,7 +84,7 @@ export class AddPageCommand extends BaseCommand<string> {
    */
   private createPageData(): PageData {
     // 如果提供了页面数据，使用提供的数据
-    if (this.pageData && 'id' in this.pageData && 'type' in this.pageData && 'blocks' in this.pageData) {
+    if (this.pageData && 'id' in this.pageData && 'type' in this.pageData) {
       return this.pageData as PageData
     }
     

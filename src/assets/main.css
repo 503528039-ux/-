@@ -578,29 +578,31 @@ p {
    封面特有样式
    ========================================================================== */
 
+/* 封面特效（确保主内容靠左而非居中） */
 .cover-page {
-    justify-content: center;
-    align-items: center;
-    text-align: center;
+    /* 不再强制水平居中，改由内部结构控制对齐 */
+    justify-content: flex-start;
+    align-items: flex-start;
     padding: 20mm;
     z-index: 1;
-    background: radial-gradient(circle at 50% 30%, #644B8E 0%, #2A1A40 100%);
+    background: radial-gradient(circle at 60% 40%, #644B8E 0%, #2A1A40 100%);
 }
 
+/* 旧 div 水印（已由 SVG 水印替代，保留供兼容） */
 .cover-watermark {
+    display: none;
+}
+
+/* SVG 水印：宽度 100%，高度自适应，位于页面中上方，ARCHIE 完整横跨 */
+.cover-watermark-svg {
     position: absolute;
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 200px;
-    font-family: 'Inter', sans-serif;
-    font-weight: 900;
-    color: #ffffff;
-    opacity: 0.04;
-    letter-spacing: 40px;
-    z-index: -2;
-    white-space: nowrap;
+    top: 36%;
+    left: 0;
+    width: 100%;
+    height: auto;
+    z-index: 0;
     pointer-events: none;
+    overflow: visible;
 }
 
 .cover-crop-marks {
@@ -668,32 +670,36 @@ p {
 
 .cover-page h2.en-brand {
     font-size: 22px;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: var(--archie-gold);
     letter-spacing: 16px;
     margin-bottom: 25px;
     font-weight: 400;
-    margin-left: 16px;
+    margin-left: 0;
 }
 
 .cover-page h1.cn-brand {
     font-size: 100px;
+    font-family: 'Noto Serif SC', serif;
     font-weight: 700;
     color: #ffffff;
     letter-spacing: 24px;
     margin-bottom: 10px;
-    margin-left: 24px;
+    margin-left: 0;
     line-height: 1.1;
     text-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
 }
 
 .cover-page .year {
-    font-size: 46px;
-    font-family: 'Inter', sans-serif;
+    font-size: 38px;
+    font-family: 'Inter', -apple-system, sans-serif;
     color: #ffffff;
-    letter-spacing: 14px;
+    letter-spacing: 10px;
     font-weight: 300;
-    margin-left: 14px;
+    margin-left: 0;
     opacity: 0.9;
+    white-space: nowrap;
 }
 
 /* ==========================================================================

@@ -134,6 +134,13 @@ function cancelEdit() {
 function startEdit() {
   isEditing.value = true
 }
+
+// 封面产品图路径（优先使用 store 中自定义图，否则用默认生成图）
+const coverImageSrc = computed(() => {
+  const stored = store.pages[props.pageIndex]?.props?.coverImage
+  // 需求：清空封面图片框内容（不显示任何默认图）
+  return stored || ''
+})
 </script>
 
 <template>
@@ -248,10 +255,27 @@ function startEdit() {
         </div>
       </div>
 
-      <!-- 水印背景 (使用 main.css 中的 .cover-watermark) -->
-      <div v-if="watermarkText" class="cover-watermark">
-        {{ watermarkText }}
-      </div>
+      <!-- 水印背景：用 SVG textLength 强制文字精确填满 viewBox 宽度，两边固定 5% 留白 -->
+      <!-- viewBox 宽 1000，textLength=900 → 两边各留 50 单位(5%)，绝不截断 -->
+      <svg v-if="watermarkText"
+        class="cover-watermark-svg"
+        viewBox="0 0 1000 260"
+        preserveAspectRatio="xMidYMid meet"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <text
+          x="500" y="210"
+          text-anchor="middle"
+          textLength="880"
+          lengthAdjust="spacingAndGlyphs"
+          font-family="'Inter', -apple-system, sans-serif"
+          font-weight="900"
+          font-size="210"
+          fill="white"
+          opacity="0.07"
+        >{{ watermarkText }}</text>
+      </svg>
 
       <!-- 裁切线 (使用 main.css 中的 .cover-crop-marks) -->
       <div v-if="showCropMarks" class="cover-crop-marks">
@@ -261,48 +285,41 @@ function startEdit() {
         <div class="crop-br"></div>
       </div>
 
-      <!-- 装饰背景 (SVG) - 使用 main.css 中的 .cover-sketch-bg -->
-      <div v-if="showDecoration" class="cover-sketch-bg">
-        <svg viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg" style="width: 110%; transform: rotate(-5deg);">
-          <defs>
-            <linearGradient id="modern-gold" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#C5A87B"/>
-              <stop offset="40%" stop-color="#9A805E"/>
-              <stop offset="70%" stop-color="#5E4B35"/>
-              <stop offset="100%" stop-color="#2A1E12"/>
-            </linearGradient>
-            <filter id="luxury-shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="15" dy="25" stdDeviation="20" flood-color="#000000" flood-opacity="0.5"/>
-            </filter>
-          </defs>
-          <g filter="url(#luxury-shadow)">
-            <circle cx="150" cy="180" r="70" fill="url(#modern-gold)"/>
-            <circle cx="150" cy="180" r="55" fill="none" stroke="#C5A87B" stroke-width="2" opacity="0.3"/>
-            <circle cx="150" cy="180" r="30" fill="url(#modern-gold)"/>
-            <circle cx="150" cy="180" r="18" fill="#111" opacity="0.8"/>
-            <circle cx="150" cy="380" r="70" fill="url(#modern-gold)"/>
-            <circle cx="150" cy="380" r="55" fill="none" stroke="#C5A87B" stroke-width="2" opacity="0.3"/>
-            <circle cx="150" cy="368" r="12" fill="#111"/>
-            <path d="M 143 368 L 138 398 C 138 405, 162 405, 162 398 L 157 368 Z" fill="#111"/>
-            <path d="M 150 162 C 200 162, 280 165, 420 165 C 445 165, 455 175, 455 180 C 455 185, 445 195, 420 195 L 150 195 Z" fill="url(#modern-gold)"/>
-            <path d="M 160 165 C 220 168, 300 168, 410 168" fill="none" stroke="#C5A87B" stroke-width="3" opacity="0.4"/>
-          </g>
-        </svg>
-      </div>
+      <!-- 装饰背景已移除把手图形，保留节点供将来扩展 -->
 
       <!-- 封面主内容 (使用 main.css 中的样式类) -->
-      <h2 class="en-brand">{{ englishBrand }}</h2>
-      <h1 class="cn-brand">{{ mainTitle }}</h1>
+      <img src="/archie-logo-white.png" alt="ARCHIE Logo" class="cover-logo" />
       
-      <!-- 金色分隔线 (完全匹配 HTML) -->
-      <div style="width: 2px; height: 50mm; background-color: var(--archie-gold); margin: 15mm auto; box-shadow: 0 0 10px rgba(154,128,94,0.5);"></div>
-      
-      <!-- 年份标题 -->
-      <div class="year">{{ year }} {{ subtitle }}</div>
-      
-       <!-- 英文副标题 -->
-      <div style="font-size: 10px; letter-spacing: 5px; color: var(--archie-gold); margin-top: 15px; opacity: 0.8; white-space: nowrap;">
-        {{ englishSubtitle }}
+      <div class="title-group">
+        <h2 class="en-brand" style="margin-bottom: 5mm; margin-left: 24px;">{{ englishBrand }}</h2>
+        <h1 class="cn-brand">{{ mainTitle }}</h1>
+      </div>
+
+      <div class="middle-group">
+        <!-- 年份标题 -->
+        <div class="year">{{ year }} {{ subtitle }}</div>
+        
+        <!-- 英文副标题 -->
+        <div style="font-size: 10px; letter-spacing: 5px; color: var(--archie-gold); margin-top: 10px; margin-left: 18px; opacity: 0.8; white-space: nowrap;">
+          {{ englishSubtitle }}
+        </div>
+      </div>
+
+      <!-- 悬浮高级产品图填充 -->
+      <div class="cover-hero-product">
+        <img src="/salo-handles-cutout.png" alt="Archie SALO Door Handle" />
+      </div>
+
+      <!-- 底部品牌信息块 (左右非对称平衡) -->
+      <div class="cover-bottom-info">
+        <div class="bottom-left">
+          <div class="company-name">广东雅洁五金有限公司</div>
+          <div class="company-en">Guangdong Archie Hardware Co., Ltd.</div>
+        </div>
+        <div class="bottom-right">
+          <div class="brand-slogan">专注五金领域的创想家 / Since 1990</div>
+          <div class="company-url">www.archie.com.cn</div>
+        </div>
       </div>
   </A4Page>
 </template>
@@ -312,6 +329,130 @@ function startEdit() {
   封面页样式 - 主要样式已在 src/assets/main.css 中定义
   此处仅保留组件特定的覆盖样式
 */
+
+/* 封面产品图区域（如果有的话保留，logo样式在此添加） */
+.cover-logo {
+  position: absolute;
+  top: 15mm;
+  left: 20mm;
+  height: 6mm; /* 缩小变为精致印记 */
+  width: auto;
+  max-width: 50mm;
+  object-fit: contain;
+  opacity: 0.95;
+  z-index: 20;
+}
+
+/* 顶部标题组排版容器 */
+.title-group {
+  margin-top: 30mm;
+  margin-left: 5mm; /* 配合 .cn-brand 本身的 margin-left */
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 中部过渡排版容器 */
+.middle-group {
+  margin-top: 25mm;
+  margin-left: 10mm; /* 减小左偏，防止文字右侧溢出 */
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: calc(100% - 10mm);
+  box-sizing: border-box;
+}
+
+/* 底部品牌信息块拆分：不对称平衡 */
+.cover-bottom-info {
+  margin-top: auto; 
+  margin-bottom: 20mm; 
+  width: 100%;
+  display: flex;
+  flex-direction: row; /* 改为横向分布 */
+  justify-content: space-between;
+  align-items: flex-end;
+  position: relative;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.bottom-left, .bottom-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-left {
+  align-items: flex-start;
+  text-align: left;
+  gap: 4px;
+}
+
+.bottom-right {
+  align-items: flex-end;
+  text-align: right;
+  gap: 4px;
+}
+
+.brand-slogan {
+  font-size: 11px;
+  letter-spacing: 3px;
+  color: var(--archie-gold);
+  opacity: 0.9;
+  font-weight: 300;
+  margin-bottom: 4px;
+}
+
+.company-name {
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: #ffffff;
+  opacity: 0.85;
+  font-weight: 300;
+}
+
+.company-en {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  color: #ffffff;
+  opacity: 0.6;
+  font-family: 'Inter', -apple-system, sans-serif;
+  text-transform: uppercase;
+}
+
+.company-url {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--archie-gold);
+  opacity: 0.7;
+  font-family: 'Inter', -apple-system, sans-serif;
+}
+
+.cover-divider-space {
+  display: none; /* 使用排版容器间距替代这个粗暴的留白 */
+}
+
+/* 高级产品暗纹融入样式 */
+.cover-hero-product {
+  position: absolute;
+  top: calc(45% + 5mm); /* 向下移动5mm */
+  right: -15mm; /* 根据要求调整至 -15mm，找到最合适的边缘裁切点 */
+  width: 165mm; /* 保持大尺寸 */
+  z-index: 5; /* 放在文字层之下，作为背景元素 */
+  opacity: 0.35; /* 调整透明度，使其成为暗纹效果 */
+  mix-blend-mode: luminosity; /* 亮度混合模式，将其颜色完全吸收到紫底中 */
+  pointer-events: none;
+}
+.cover-hero-product img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  filter: contrast(1.2); /* 稍微提升对比度让轮廓清晰 */
+}
 
 /* 响应式调整 - 小屏设备 */
 @media screen and (max-width: 768px) {

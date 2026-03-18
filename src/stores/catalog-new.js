@@ -2,6 +2,8 @@ import { ref, watch, computed, nextTick } from 'vue'
 import { defineStore } from 'pinia'
 import * as XLSX from 'xlsx'
 import { nanoid } from 'nanoid'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 // 导入命令模式相关类
 import {
@@ -437,11 +439,9 @@ export const useCatalogStore = defineStore('catalog', () => {
         _removePage: _removePage,
         _movePage: _movePage,
         _updatePage: _updatePage
-      }, type)
-      
-      // 注意：这里的 createAddPageCommand 内部可能直接调用了 createPageData
-      // 我们需要确保命令模式也能使用 getInitialPageData
-      // 或者直接手动处理 pages 数组并记录快照
+      }, type, undefined, newPageData)
+      // newPageData 来自 getInitialPageData(type)，含完整预填数据
+      // AddPageCommand 会优先使用它，而非自己 createPageData()
       const result = commandManager.execute(command)
       if (!result.success) {
         console.error('插入页面失败:', result.error)
@@ -780,6 +780,208 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
+  /**
+   * 切换打印预览模式（隐藏侧栏等 UI，便于预览与导出）
+   */
+  function triggerPrint() {
+    printMode.value = !printMode.value
+    if (printMode.value) {
+      alert('已进入打印预览模式。点击「PDF」按钮可导出 PDF 文件。')
+    }
+  }
+
+  /**
+   * 导出 PDF（印刷级）：使用浏览器打印管线生成 PDF（文字为矢量，清晰且文件更小）
+   *
+   * 说明：
+   * - 该方式由用户在系统打印对话框里选择“存储为 PDF”
+   * - 通过 printMode 隐藏编辑 UI，并依赖 @media print CSS 去阴影、分页等
+   */
+  async function exportToPDF() {
+    const originalPrintMode = printMode.value
+    printMode.value = true
+    await nextTick()
+
+    // Orion/WebKit 下首次打印容易“抢跑”（字体/图片/布局未就绪就进入打印管线），
+    // 会导致导出的 PDF 出现低清/阴影等问题。这里显式等待关键资源与布局稳定。
+    async function waitForPrintReady() {
+      // 等两帧，确保样式计算与布局完成
+      await new Promise(resolve => requestAnimationFrame(() => resolve()))
+      await new Promise(resolve => requestAnimationFrame(() => resolve()))
+
+      // 等字体加载完成（如果浏览器支持）
+      try {
+        if (document?.fonts?.ready) {
+          await Promise.race([
+            document.fonts.ready,
+            new Promise(resolve => setTimeout(resolve, 5000))
+          ])
+        }
+      } catch (e) {
+        // 忽略字体等待失败，继续流程
+      }
+
+      // 等图片解码完成（避免首屏图片未 decode 导致打印管线降质/闪白）
+      try {
+        const imgs = Array.from(document.querySelectorAll('.a4-page img'))
+        const decodePromises = imgs.map(img => {
+          if (!img) return Promise.resolve()
+          // 已完成的直接跳过
+          if (img.complete && img.naturalWidth > 0) return Promise.resolve()
+          // decode 在部分 WebKit 上可能抛错，做保护
+          if (typeof img.decode === 'function') return img.decode().catch(() => {})
+          return new Promise(resolve => {
+            img.onload = () => resolve()
+            img.onerror = () => resolve()
+          })
+        })
+        await Promise.race([
+          Promise.allSettled(decodePromises),
+          new Promise(resolve => setTimeout(resolve, 5000))
+        ])
+      } catch (e) {
+        // 忽略图片等待失败，继续流程
+      }
+
+      // 再等一帧，让布局在字体/图片就绪后最终稳定
+      await new Promise(resolve => requestAnimationFrame(() => resolve()))
+    }
+
+    await waitForPrintReady()
+
+    const pageContainers = document.querySelectorAll('.a4-page')
+    if (pageContainers.length === 0) {
+      alert('没有找到可导出的页面')
+      printMode.value = originalPrintMode
+      return
+    }
+
+    let restored = false
+    const restore = () => {
+      if (restored) return
+      restored = true
+      printMode.value = originalPrintMode
+    }
+
+    // 兼容：Safari/Chrome/Edge 在打印完成后触发 afterprint
+    const handleAfterPrint = () => {
+      window.removeEventListener('afterprint', handleAfterPrint)
+      restore()
+    }
+
+    window.addEventListener('afterprint', handleAfterPrint)
+
+    // 打开系统打印对话框（用户选择“存储为 PDF”）
+    // 若浏览器未触发 afterprint（极少数情况），用较长超时兜底，避免打印过程中提前退出预览
+    setTimeout(() => restore(), 60000)
+    window.print()
+  }
+
+  /**
+   * 备选导出：高清图片 PDF（栅格化）
+   *
+   * 适用场景：
+   * - 某些浏览器打印管线对滤镜/混合模式/字体渲染不一致
+   *
+   * 注意：
+   * - 该方式是“截图->写入PDF”，文字会变成位图；清晰度由 targetDpi 决定，文件也会更大
+   */
+  async function exportToPDFImage(options = {}) {
+    const {
+      targetDpi = 300,
+      imageType = 'image/png'
+    } = options || {}
+
+    try {
+      const loadingEl = document.createElement('div')
+      loadingEl.innerHTML = `
+        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;font-family:sans-serif;">
+          <div style="font-size:24px;margin-bottom:20px;">正在生成高清PDF...</div>
+          <div style="font-size:16px;margin-bottom:30px;">请稍候（DPI: ${targetDpi}）</div>
+          <div style="width:200px;height:4px;background:#444;border-radius:2px;overflow:hidden;">
+            <div id="pdf-progress" style="width:0%;height:100%;background:#4F46E5;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      `
+      document.body.appendChild(loadingEl)
+
+      const noPrintEls = document.querySelectorAll('.no-print, .drag-handle, [class*="absolute"][class*="top"][class*="right"], [class*="absolute"][class*="top"][class*="left"]')
+      const originalDisplay = []
+      noPrintEls.forEach(el => {
+        originalDisplay.push(el.style.display)
+        el.style.display = 'none'
+      })
+
+      const originalPrintMode = printMode.value
+      printMode.value = true
+      await nextTick()
+
+      const pageContainers = document.querySelectorAll('.a4-page')
+      if (pageContainers.length === 0) {
+        alert('没有找到可导出的页面')
+        printMode.value = originalPrintMode
+        noPrintEls.forEach((el, i) => { el.style.display = originalDisplay[i] })
+        document.body.removeChild(loadingEl)
+        return
+      }
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      pdf.setProperties({
+        title: '雅洁五金2026工程图册',
+        subject: '工程产品手册',
+        author: '雅洁五金有限公司',
+        creator: 'ARCHIE STUDIO'
+      })
+
+      const mmToPx = targetDpi / 25.4
+      const targetWidth = 210
+      const targetHeight = 297
+
+      for (let i = 0; i < pageContainers.length; i++) {
+        const progressEl = document.getElementById('pdf-progress')
+        if (progressEl) progressEl.style.width = `${((i + 1) / pageContainers.length) * 100}%`
+
+        const container = pageContainers[i]
+        try {
+          const rect = container.getBoundingClientRect()
+          const scale = Math.min((targetWidth * mmToPx) / rect.width, (targetHeight * mmToPx) / rect.height)
+          const canvas = await html2canvas(container, {
+            scale,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#FFFFFF',
+            logging: false,
+            onclone: (clonedDoc) => {
+              clonedDoc.querySelectorAll('.a4-page').forEach(el => {
+                el.style.boxShadow = 'none'
+              })
+            }
+          })
+
+          const imgData = canvas.toDataURL(imageType)
+          if (i > 0) pdf.addPage()
+          pdf.addImage(imgData, 'PNG', 0, 0, targetWidth, targetHeight, undefined, 'FAST')
+        } catch (err) {
+          console.error(`处理第${i + 1}页时出错:`, err)
+        }
+      }
+
+      noPrintEls.forEach((el, i) => { el.style.display = originalDisplay[i] })
+      printMode.value = originalPrintMode
+      document.body.removeChild(loadingEl)
+
+      const fileName = `雅洁五金2026工程图册_高清_${targetDpi}dpi_${new Date().toISOString().split('T')[0]}.pdf`
+      pdf.save(fileName)
+      alert(`高清 PDF 导出成功，共 ${pageContainers.length} 页（${targetDpi} DPI）。`)
+    } catch (error) {
+      console.error('高清PDF导出失败:', error)
+      alert('高清 PDF 导出失败: ' + (error.message || String(error)))
+      const loadingEl = document.querySelector('div[style*="position:fixed;top:0"]')
+      if (loadingEl && loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl)
+      printMode.value = false
+    }
+  }
+
   // 数据持久化：自动保存到localStorage（使用版本化管理）
   watch(pages, (newVal) => {
     try {
@@ -829,7 +1031,10 @@ export const useCatalogStore = defineStore('catalog', () => {
     importExcel,
     setPageSize,
     insertPage,
-    
+    triggerPrint,
+    exportToPDF,
+    exportToPDFImage,
+
     // 命令模式相关
     useCommandMode,
     canUndo,

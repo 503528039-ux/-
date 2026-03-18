@@ -111,7 +111,7 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
       @end="store.recordDragEnd()"
     >
        <template #item="{ element: page, index }">
-        <div class="a4-page relative group print:shadow-none print:m-0 print:break-after-page overflow-hidden flex flex-col mx-auto transition-all duration-300"
+        <div class="page-outer-wrapper relative group print:shadow-none print:m-0 overflow-hidden flex flex-col mx-auto transition-all duration-300"
              :class="page.type === 'cover' ? 'shadow-xl' : 'bg-white shadow-xl'"
              :style="{ width: page.width + 'mm', height: page.height + 'mm' }">
           
@@ -142,18 +142,18 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
 </template>
 
 <style scoped>
-.a4-page {
+.page-outer-wrapper {
   width: 210mm;
   height: 297mm;
 }
 
 @media print {
-  .a4-page {
+  .page-outer-wrapper {
     margin: 0;
     box-shadow: none;
-    break-after: page;
+    /* 不加 break-after，避免与内层 A4Page 的 page-break-after 叠加产生空白页 */
   }
-  
+
   .no-print {
     display: none !important;
   }

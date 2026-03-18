@@ -1,90 +1,48 @@
 <script setup>
+import { computed } from 'vue'
+import { useCatalogStore } from '../../stores/index'
 import A4Page from '../layout/A4Page.vue'
-import PageHeader from '../layout/PageHeader.vue'
-import PageFooter from '../layout/PageFooter.vue'
+import EditableText from '../ui/EditableText.vue'
 
 const props = defineProps({
-  // 页面标题配置
-  title: {
-    type: String,
-    default: '质感美学'
-  },
-  subtitle: {
-    type: String,
-    default: 'Surface Finishes'
-  },
-  
-  // 表面处理数据
-  finishes: {
-    type: Array,
-    default: () => [
-      {
-        id: 1,
-        name: 'PVD 钛金',
-        enName: 'PVD Titanium',
-        colorClass: 'swatch-pvd',
-        gradient: 'linear-gradient(135deg, #e6c27a 0%, #b8860b 50%, #8b6508 100%)'
-      },
-      {
-        id: 2,
-        name: '哑光黑',
-        enName: 'Matte Black',
-        colorClass: 'swatch-black',
-        gradient: 'linear-gradient(135deg, #333 0%, #1a1a1a 50%, #000 100%)'
-      },
-      {
-        id: 3,
-        name: '拉丝砂镍',
-        enName: 'Satin Nickel',
-        colorClass: 'swatch-nickel',
-        gradient: 'linear-gradient(135deg, #d3d3d3 0%, #a9a9a9 50%, #808080 100%)'
-      },
-      {
-        id: 4,
-        name: '拉丝枪灰',
-        enName: 'Gunmetal',
-        colorClass: 'swatch-gunmetal',
-        gradient: 'linear-gradient(135deg, #7a7a8c 0%, #4a4a5a 50%, #2a2a3a 100%)'
-      },
-      {
-        id: 5,
-        name: '青古铜',
-        enName: 'A. Bronze',
-        colorClass: 'swatch-bronze',
-        gradient: 'linear-gradient(135deg, #cd7f32 0%, #8b4513 50%, #5c3317 100%)'
-      },
-      {
-        id: 6,
-        name: '烤漆白',
-        enName: 'Baked White',
-        colorClass: 'swatch-white',
-        gradient: 'linear-gradient(135deg, #fff 0%, #f0f0f0 50%, #e0e0e0 100%)'
-      }
-    ]
-  },
-  
-  // 页面元数据
-  pageNumber: {
-    type: [String, Number],
-    default: 5
-  },
-  totalPages: {
-    type: [String, Number],
-    default: 48
-  }
+  pageIndex: { type: Number, required: true }
 })
+
+const store = useCatalogStore()
+const pageData = computed(() => store.pages[props.pageIndex] || {})
+
+const displayTitle = computed(() => pageData.value.title || '质感美学')
+const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Surface Finishes')
+const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
+const totalPages = computed(() => store.pages.length)
+
+const finishes = computed(() => pageData.value.items || [])
+
+function updateTitle(val) {
+  const page = store.pages[props.pageIndex]
+  if (page) page.title = val
+}
+
+function updateSubtitle(val) {
+  const page = store.pages[props.pageIndex]
+  if (page) {
+    page.sub = val
+    page.subtitle = val
+  }
+}
 </script>
 
 <template>
   <A4Page
-    :title="title"
-    :pageNumber="pageNumber"
+    :page-title="headerTitle"
+    :page-number="props.pageIndex + 1"
+    :total-pages="totalPages"
     :showHeader="true"
     :showFooter="true"
   >
     <div class="content-section">
-      <h2 class="section-title">{{ title }}</h2>
-      <p class="section-subtitle">{{ subtitle }}</p>
+      <EditableText tag="h2" className="section-title" :value="displayTitle" @update:value="updateTitle" />
+      <EditableText tag="p" className="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
       
       <!-- 表面处理介绍 -->
       <div 
@@ -111,7 +69,7 @@ const props = defineProps({
         }"
       >
         <div 
-          v-for="finish in props.finishes" 
+          v-for="finish in finishes" 
           :key="finish.id"
           class="finish-item"
           :style="{
@@ -177,7 +135,7 @@ const props = defineProps({
               marginBottom: 'var(--spacing-xs)'
             }"
           >
-            {{ finish.enName }}
+            {{ finish.en || finish.enName }}
           </div>
           
           <!-- 工艺描述 -->
@@ -196,138 +154,6 @@ const props = defineProps({
         </div>
       </div>
       
-      <!-- 工艺特性说明 -->
-      <div 
-        class="finishes-features"
-        :style="{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 'var(--spacing-md)',
-          marginTop: 'var(--spacing-xl)',
-          paddingTop: 'var(--spacing-lg)',
-          borderTop: '1px solid var(--color-divider)'
-        }"
-      >
-        <div class="feature-item">
-          <div 
-            class="feature-icon"
-            :style="{
-              fontSize: '20px',
-              color: 'var(--color-archie-gold)',
-              marginBottom: 'var(--spacing-xs)'
-            }"
-          >
-            ⚡
-          </div>
-          <div 
-            class="feature-title"
-            :style="{
-              fontSize: '10px',
-              fontWeight: '700',
-              color: 'var(--color-text-dark)',
-              marginBottom: '2px'
-            }"
-          >
-            耐磨测试
-          </div>
-          <div 
-            class="feature-desc"
-            :style="{
-              fontSize: '8px',
-              color: 'var(--color-text-gray)',
-              lineHeight: '1.4'
-            }"
-          >
-            通过10万次摩擦测试，色彩持久如新
-          </div>
-        </div>
-        
-        <div class="feature-item">
-          <div 
-            class="feature-icon"
-            :style="{
-              fontSize: '20px',
-              color: 'var(--color-archie-gold)',
-              marginBottom: 'var(--spacing-xs)'
-            }"
-          >
-            🛡️
-          </div>
-          <div 
-            class="feature-title"
-            :style="{
-              fontSize: '10px',
-              fontWeight: '700',
-              color: 'var(--color-text-dark)',
-              marginBottom: '2px'
-            }"
-          >
-            耐腐蚀性
-          </div>
-          <div 
-            class="feature-desc"
-            :style="{
-              fontSize: '8px',
-              color: 'var(--color-text-gray)',
-              lineHeight: '1.4'
-            }"
-          >
-            盐雾测试超过500小时，抗腐蚀性能卓越
-          </div>
-        </div>
-        
-        <div class="feature-item">
-          <div 
-            class="feature-icon"
-            :style="{
-              fontSize: '20px',
-              color: 'var(--color-archie-gold)',
-              marginBottom: 'var(--spacing-xs)'
-            }"
-          >
-            🎨
-          </div>
-          <div 
-            class="feature-title"
-            :style="{
-              fontSize: '10px',
-              fontWeight: '700',
-              color: 'var(--color-text-dark)',
-              marginBottom: '2px'
-            }"
-          >
-            色彩一致性
-          </div>
-          <div 
-            class="feature-desc"
-            :style="{
-              fontSize: '8px',
-              color: 'var(--color-text-gray)',
-              lineHeight: '1.4'
-            }"
-          >
-            批次色差控制在ΔE≤1.5，确保色彩统一
-          </div>
-        </div>
-      </div>
-      
-      <!-- 底部说明 -->
-      <div 
-        class="finishes-footer"
-        :style="{
-          fontSize: '9px',
-          color: 'var(--color-text-gray)',
-          textAlign: 'center',
-          marginTop: 'var(--spacing-lg)',
-          padding: 'var(--spacing-md)',
-          backgroundColor: 'var(--color-luxury-cream)',
-          borderRadius: '6px',
-          lineHeight: '1.6'
-        }"
-      >
-        <p>所有表面处理均符合欧盟RoHS环保标准，不含重金属有害物质。</p>
-        <p style="marginTop: 'var(--spacing-xs)', fontWeight: '500'">定制服务：支持客户专属颜色和纹理定制。</p>
-      </div>
     </div>
 
     <!-- 页脚插槽内容 -->

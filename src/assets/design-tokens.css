@@ -125,7 +125,7 @@
 /* @page 规则 - 严格的 A4 纸张设置 */
 @page {
   size: A4;                        /* ISO 216 标准 A4 */
-  margin: 15mm;                    /* 统一页边距 */
+  margin: 0;                       /* 页边距由 .page-content 控制，避免与 @page 叠加 */
 }
 
 /* 打印适配 */
@@ -150,12 +150,11 @@
     gap: 0 !important;
   }
 
-  /* A4 页面打印样式 */
+  /* A4 页面打印样式（不设 padding，避免与 .page-content 叠加导致版式收窄） */
   .a4-page {
     width: 210mm;
     height: 297mm;
     margin: 0;
-    padding: var(--size-page-padding);
     box-shadow: none;
     page-break-after: always;
     page-break-inside: avoid;

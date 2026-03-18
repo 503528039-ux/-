@@ -2,139 +2,117 @@
 import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
 import A4Page from '../layout/A4Page.vue'
+import EditableText from '../ui/EditableText.vue'
+import ImageUploader from '../ui/ImageUploader.vue'
 
 const props = defineProps({
-  /** 页面在 store.pages 中的索引 */
-  pageIndex: {
-    type: Number,
-    required: true
-  }
+  pageIndex: { type: Number, required: true }
 })
 
-// ===== Store 初始化 =====
 const store = useCatalogStore()
 
-// ===== 计算属性 =====
+const pageData = computed(() => store.pages[props.pageIndex] || {})
+const displayTitle = computed(() => pageData.value.title || '筑造地标')
+const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Engineering Cases')
+const casesList = computed(() => pageData.value.items || [])
+const hasData = computed(() => casesList.value.length > 0)
+const totalPages = computed(() => store.pages.length)
 
-/** 当前页面数据 */
-const pageData = computed(() => {
-  return store.pages[props.pageIndex] || {}
-})
+// 页眉右上角统一标题
+const headerTitle = computed(() => `2026 工程产品手册 / ${displayTitle.value}`)
 
-/** 页面标题 */
-const displayTitle = computed(() => {
-  return pageData.value.title || '筑造地标'
-})
+const topCase = computed(() => casesList.value[0] || { image: '', category: 'COMMERCIAL COMPLEX', name: '上海中心大厦', en: 'Shanghai Tower' })
+const bottomCase = computed(() => casesList.value[1] || { image: '', category: 'RESORT HOTEL', name: '三亚海棠湾洲际度假酒店', en: 'IHG Resort' })
 
-/** 页面副标题 */
-const displaySubtitle = computed(() => {
-  return pageData.value.sub || pageData.value.subtitle || 'Engineering Cases'
-})
-
-/** 案例数据 */
-const casesList = computed(() => {
-  return pageData.value.items || []
-})
-
-/** 上半部分案例 */
-const topCase = computed(() => {
-  return casesList.value[0] || {
-    image: '',
-    category: 'COMMERCIAL COMPLEX',
-    name: '上海中心大厦',
-    enTitle: 'Shanghai Tower'
+function updateTitle(val) {
+  const page = store.pages[props.pageIndex]
+  if (page) page.title = val
+}
+function updateSubtitle(val) {
+  const page = store.pages[props.pageIndex]
+  if (page) { page.sub = val; page.subtitle = val }
+}
+function ensureItem(index) {
+  const page = store.pages[props.pageIndex]
+  if (!page) return
+  if (!Array.isArray(page.items)) page.items = []
+  while (page.items.length <= index) {
+    page.items.push({ id: `auto-${page.items.length}`, category: '', name: '', en: '', image: '' })
   }
-})
-
-/** 下半部分案例 */
-const bottomCase = computed(() => {
-  return casesList.value[1] || {
-    image: '',
-    category: 'RESORT HOTEL',
-    name: '三亚海棠湾洲际度假酒店',
-    enTitle: 'IHG Resort'
-  }
-})
-
-/** 是否有数据 */
-const hasData = computed(() => {
-  return casesList.value.length > 0
-})
-
-/** 总页数 */
-const totalPages = computed(() => {
-  return store.pages.length
-})
+}
+function updateCaseImage(index, src) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  if (page?.items?.[index]) page.items[index].image = src
+}
+function updateCaseCategory(index, val) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  if (page?.items?.[index]) page.items[index].category = val
+}
+function updateCaseName(index, val) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  if (page?.items?.[index]) { page.items[index].name = val; page.items[index].title = val }
+}
+function updateCaseEn(index, val) {
+  ensureItem(index)
+  const page = store.pages[props.pageIndex]
+  if (page?.items?.[index]) { page.items[index].en = val; page.items[index].enTitle = val }
+}
 </script>
 
 <template>
   <A4Page
-    :title="displayTitle"
-    :pageNumber="props.pageIndex + 1"
-    :totalPages="totalPages"
+    :page-title="headerTitle"
+    :page-number="props.pageIndex + 1"
+    :total-pages="totalPages"
     :showHeader="true"
     :showFooter="true"
   >
-    <!-- Section 标题区域 -->
     <div class="content-section-header">
-      <h2 class="section-title">{{ displayTitle }}</h2>
-      <p class="section-subtitle">{{ displaySubtitle }}</p>
+      <EditableText tag="h2" className="section-title" :value="displayTitle" @update:value="updateTitle" />
+      <EditableText tag="p" className="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
     </div>
 
-    <!-- 出血排版：两张图片各 flex:1，负边距出血 -->
     <div v-if="hasData" class="cases-container">
-      <!-- 上半部分案例 -->
+      <!-- 上半案例 -->
       <div class="case-item">
-        <!-- 图片 -->
         <div class="case-image-box">
-          <img
-            v-if="topCase.image"
-            :src="topCase.image"
-            alt="工程案例图片"
-            class="case-img"
-          />
+          <img v-if="topCase.image" :src="topCase.image" class="case-img" alt="工程案例图片" />
           <div v-else class="case-placeholder">
             <div class="placeholder-icon">🏗️</div>
             <div class="placeholder-text">案例图待上传</div>
           </div>
-          <!-- 渐变遮罩 -->
+          <ImageUploader @update:src="(src) => updateCaseImage(0, src)" />
           <div class="case-overlay"></div>
         </div>
-        <!-- 文字叠加 -->
         <div class="case-caption">
-          <span class="case-category">{{ topCase.category || topCase.loc }}</span>
-          <h3 class="case-title-cn">{{ topCase.name || topCase.title }}</h3>
-          <p class="case-title-en">{{ topCase.enTitle || topCase.desc }}</p>
+          <EditableText tag="span" className="case-category" :value="topCase.category || ''" @update:value="(v) => updateCaseCategory(0, v)" />
+          <EditableText tag="h3" className="case-title-cn" :value="topCase.name || ''" @update:value="(v) => updateCaseName(0, v)" />
+          <EditableText tag="p" className="case-title-en" :value="topCase.en || topCase.enTitle || ''" @update:value="(v) => updateCaseEn(0, v)" />
         </div>
       </div>
 
-      <!-- 下半部分案例 -->
+      <!-- 下半案例 -->
       <div class="case-item">
-        <!-- 图片 -->
         <div class="case-image-box">
-          <img
-            v-if="bottomCase.image"
-            :src="bottomCase.image"
-            alt="工程案例图片"
-            class="case-img"
-          />
+          <img v-if="bottomCase.image" :src="bottomCase.image" class="case-img" alt="工程案例图片" />
           <div v-else class="case-placeholder">
             <div class="placeholder-icon">🏨</div>
             <div class="placeholder-text">案例图待上传</div>
           </div>
-          <!-- 渐变遮罩 -->
+          <ImageUploader @update:src="(src) => updateCaseImage(1, src)" />
           <div class="case-overlay"></div>
         </div>
-        <!-- 文字叠加 -->
         <div class="case-caption">
-          <span class="case-category">{{ bottomCase.category || bottomCase.loc }}</span>
-          <h3 class="case-title-cn">{{ bottomCase.name || bottomCase.title }}</h3>
-          <p class="case-title-en">{{ bottomCase.enTitle || bottomCase.desc }}</p>
+          <EditableText tag="span" className="case-category" :value="bottomCase.category || ''" @update:value="(v) => updateCaseCategory(1, v)" />
+          <EditableText tag="h3" className="case-title-cn" :value="bottomCase.name || ''" @update:value="(v) => updateCaseName(1, v)" />
+          <EditableText tag="p" className="case-title-en" :value="bottomCase.en || bottomCase.enTitle || ''" @update:value="(v) => updateCaseEn(1, v)" />
         </div>
       </div>
     </div>
 
-    <!-- 空状态 -->
     <div v-else class="empty-state">
       <div class="empty-icon">🏗️</div>
       <p class="empty-text">暂无工程案例数据</p>
@@ -165,7 +143,6 @@ const totalPages = computed(() => {
   font-weight: 500;
 }
 
-/* 出血排版：负边距撑满页面宽度 */
 .cases-container {
   display: flex;
   flex-direction: column;
@@ -193,7 +170,6 @@ const totalPages = computed(() => {
   object-fit: cover;
 }
 
-/* 渐变遮罩 */
 .case-overlay {
   position: absolute;
   bottom: 0;
@@ -201,9 +177,9 @@ const totalPages = computed(() => {
   right: 0;
   height: 60%;
   background: linear-gradient(transparent, rgba(0, 0, 0, 0.9));
+  pointer-events: none;
 }
 
-/* 文字叠加区域 */
 .case-caption {
   position: absolute;
   bottom: 0;
@@ -238,7 +214,6 @@ const totalPages = computed(() => {
   font-family: 'Inter', sans-serif;
 }
 
-/* 空状态样式 */
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -253,27 +228,14 @@ const totalPages = computed(() => {
   flex: 1;
 }
 
-.empty-icon {
-  font-size: 64px;
-  opacity: 0.5;
-}
+.empty-icon { font-size: 64px; opacity: 0.5; }
+.empty-text { font-size: 20px; font-weight: 600; color: #1d1d1f; }
+.empty-hint { font-size: 14px; color: #86868b; }
 
-.empty-text {
-  font-size: 20px;
-  font-weight: 600;
-  color: #1d1d1f;
-}
-
-.empty-hint {
-  font-size: 14px;
-  color: #86868b;
-}
-
-/* 占位图样式 */
 .case-placeholder {
   width: 100%;
   height: 100%;
-  background-color: #f0f0f2;
+  background: linear-gradient(to bottom, #E8E8EA 0%, #2C2C2C 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -281,24 +243,11 @@ const totalPages = computed(() => {
   gap: 12px;
 }
 
-.placeholder-icon {
-  font-size: 40px;
-  opacity: 0.3;
-}
+.placeholder-icon { font-size: 40px; opacity: 0.3; }
+.placeholder-text { font-size: 12px; color: #86868b; }
 
-.placeholder-text {
-  font-size: 12px;
-  color: #86868b;
-}
-
-/* 打印优化 */
 @media print {
-  .cases-container {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .empty-state {
-    display: none;
-  }
+  .cases-container { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .empty-state { display: none; }
 }
 </style>

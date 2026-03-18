@@ -162,7 +162,10 @@ function handlePageCancelled() {
       </div>
       <div class="grid grid-cols-2 gap-2 mt-1">
           <button @click="store.triggerPrint()" class="btn-dark text-xs flex items-center justify-center gap-1">🖨 预览</button>
-          <button @click="store.exportToPDF()" class="btn-success text-xs flex items-center justify-center gap-1">📄 PDF</button>
+          <button @click="store.exportToPDF()" class="btn-success text-xs flex items-center justify-center gap-1" title="印刷级：系统打印到PDF（文字矢量，推荐）">📄 PDF</button>
+      </div>
+      <div class="grid grid-cols-1 gap-2 mt-1">
+          <button @click="store.exportToPDFImage({ targetDpi: 300 })" class="btn-tool text-xs flex items-center justify-center gap-1" title="备选：高清图片PDF（300DPI，文件更大）">🖼 高清PDF</button>
       </div>
       
       <div class="bg-blue-50 p-2 rounded text-[10px] text-blue-600 leading-tight">

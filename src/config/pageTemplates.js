@@ -51,7 +51,7 @@ export const PAGE_TEMPLATES = {
     height: 297
   },
 
-  // PAGE 04: 战略合作伙伴 (3x5 网格)
+  // PAGE 04: 战略合作伙伴 (3×5 网格，与最新页面代码.html 一致)
   'partners': {
     type: 'partners',
     title: '战略合作伙伴',

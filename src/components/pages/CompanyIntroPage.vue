@@ -20,9 +20,18 @@ const headerTitle = computed(() => {
   return `2026 工程产品手册 / 公司概况`
 })
 
-const heroSrc = computed(() => {
-  return pageData.value.heroImage || 'https://placehold.co/800x400/E5E5EA/86868B?text=%5B%2B%E9%9B%85%E6%B4%81%E5%B7%A5%E4%B8%9A%E5%9B%AD%E5%A4%96%E8%A7%82%2B%5D'
-})
+function updateField(key, val) {
+  if (!store.pages[props.pageIndex]) return
+  store.pages[props.pageIndex][key] = val
+}
+
+function onHeroUpload(e) {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => updateField('heroImage', ev.target.result)
+  reader.readAsDataURL(file)
+}
 </script>
 
 <template>
@@ -36,11 +45,41 @@ const heroSrc = computed(() => {
     <div class="section-subtitle">{{ pageData.sub || 'Company Profile' }}</div>
 
     <div class="hero-img">
-      <img :src="heroSrc" alt="雅洁工业园外观">
+      <img v-if="pageData.heroImage"
+           :src="pageData.heroImage"
+           style="width:100%;height:100%;object-fit:cover;display:block;" />
+      <div v-else class="hero-empty">
+        <span>点击上传品牌图片</span>
+      </div>
+      <input v-if="!store.printMode" type="file" accept="image/*"
+        style="position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;"
+        @change="onHeroUpload" />
     </div>
 
-    <div class="text-cols" style="white-space: pre-line;">
-      {{ pageData.story || '' }}
+    <div class="story-card">
+      <div class="text-cols" style="white-space: pre-line;">
+        {{ pageData.story || '' }}
+      </div>
     </div>
   </A4Page>
 </template>
+
+<style scoped>
+.hero-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #E5E5EA;
+  color: #86868B;
+  font-size: 13px;
+}
+
+.story-card {
+  border: 1.5px solid #C8A97E;
+  border-radius: 4px;
+  padding: 8mm;
+  margin-top: 8mm;
+}
+</style>

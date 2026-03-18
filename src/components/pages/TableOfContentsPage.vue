@@ -2,37 +2,89 @@
 /**
  * TableOfContentsPage.vue - 总目录页组件
  *
- * 基于 页面代码.txt 第 203-209 行样式和 434-453 行 HTML
+ * 基于 最新页面代码.html 目录样式与结构
  *
  * 功能：
- * - 从 catalog.ts 导入目录数据，确保页码严格对齐
- * - 使用 A4Page 作为容器
- * - v-for 渲染目录列表
- * - 页码 > 07 的项目使用 archie-gold 强调色
+ * - 从 store.pages 派生目录项与页码，与当前图册顺序一致
+ * - 按「章节类型」匹配首次出现的页面作为该章节页码
+ * - 复合产品页分两条：第 1 个 compositeProduct -> 门锁，第 2 个 -> 小五金
  */
 import { computed } from 'vue'
 import A4Page from '../layout/A4Page.vue'
-import { tableOfContents, getTotalPages } from '../../data/catalog'
-import type { TocItem } from '../../data/catalog'
+import { useCatalogStore } from '../../stores/index'
 
-// ===== 计算属性 =====
+/** 目录项（与 HTML 一致） */
+interface TocItem {
+  index: string
+  title: string
+  titleEn: string
+  pageNumber: number
+  highlight?: boolean
+}
 
-/** 目录项列表（直接从 catalog.ts 导入） */
+/** 章节配置：类型 + 显示文案，用于在 store.pages 中查找页码 */
+const TOC_SECTION_CONFIG: Array<{
+  type: string
+  subType?: string
+  /** 仅对 compositeProduct 有效：取第 occurrence 个该类型页面 */
+  occurrence?: number
+  title: string
+  titleEn: string
+  highlight: boolean
+}> = [
+  { type: 'companyIntro', title: '品牌故事', titleEn: 'Profile', highlight: false },
+  { type: 'certificates', title: '荣誉资质', titleEn: 'Certificates', highlight: false },
+  { type: 'partners', title: '战略合作', titleEn: 'Partners', highlight: false },
+  { type: 'projectCases', title: '工程案例', titleEn: 'Cases', highlight: false },
+  { type: 'surfaceFinishes', title: '表面工艺', titleEn: 'Finishes', highlight: false },
+  { type: 'product', title: '门锁五金系列 (实拍版)', titleEn: 'Locks Photo', highlight: false },
+  { type: 'productGrid', title: '工程小五金系列 (实拍版)', titleEn: 'Hardware Photo', highlight: false },
+  { type: 'compositeProduct', occurrence: 1, title: '门锁五金 (实拍+线图)', titleEn: 'Locks Tech', highlight: true },
+  { type: 'compositeProduct', occurrence: 2, title: '工程小五金 (实拍+线图)', titleEn: 'Hardware Tech', highlight: true }
+]
+
+const store = useCatalogStore()
+
+const props = withDefaults(
+  defineProps<{ pageIndex?: number }>(),
+  { pageIndex: 6 }
+)
+
+/** 根据章节配置从 store.pages 计算目录项（含页码） */
 const tocItems = computed<TocItem[]>(() => {
-  return tableOfContents
+  const pages = store.pages
+  return TOC_SECTION_CONFIG.map((cfg, i) => {
+    const indexStr = String(i + 1).padStart(2, '0')
+    let pageNumber = 0
+    if (cfg.occurrence !== undefined) {
+      const indices = pages
+        .map((p, idx) => (p.type === cfg.type ? idx + 1 : 0))
+        .filter((n) => n > 0)
+      pageNumber = indices[cfg.occurrence - 1] ?? 0
+    } else {
+      const found = pages.findIndex((p) => p.type === cfg.type && (cfg.subType == null || (p as { subType?: string }).subType === cfg.subType))
+      pageNumber = found >= 0 ? found + 1 : 0
+    }
+    return {
+      index: indexStr,
+      title: cfg.title,
+      titleEn: cfg.titleEn,
+      pageNumber,
+      highlight: cfg.highlight
+    }
+  })
 })
 
-/** 总页数 */
-const totalPages = computed(() => {
-  return getTotalPages()
-})
+/** 总页数（当前图册页数） */
+const totalPages = computed(() => store.pages.length)
 
 /** 格式化页码（补零） */
 function formatPageNumber(num: number): string {
+  if (num <= 0) return '—'
   return num < 10 ? `0${num}` : String(num)
 }
 
-/** 判断是否需要高亮显示（页码 > 7 或 highlight 为 true） */
+/** 判断是否需要高亮显示 */
 function shouldHighlight(item: TocItem): boolean {
   return item.highlight === true || item.pageNumber > 7
 }
@@ -41,7 +93,7 @@ function shouldHighlight(item: TocItem): boolean {
 <template>
   <A4Page
     page-title="2026 工程产品手册 / 总目录"
-    :page-number="7"
+    :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
     :show-header="false"
   >

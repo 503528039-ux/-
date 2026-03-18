@@ -95,7 +95,7 @@ function updateDividerNumber(val) {
   pointer-events: none;
 }
 
-h2 {
+:deep(h2) {
   color: #fff;
   font-size: 56px;
   letter-spacing: 8px;
@@ -106,7 +106,7 @@ h2 {
   font-weight: 700;
 }
 
-p {
+:deep(p) {
   color: #9A805E; /* --color-archie-gold */
   font-size: 14px;
   letter-spacing: 4px;
