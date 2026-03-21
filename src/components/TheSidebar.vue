@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useCatalogStore } from '../stores/index'
 import * as XLSX from 'xlsx'
 import ConfirmModal from './ConfirmModal.vue'
@@ -40,6 +40,39 @@ const pageSubtypeNames = {
   'lock': '门锁五金',
   'hardware': '工程小五金',
   'smartLock': '智能门锁'
+}
+
+/** 侧栏：将第 A 页移动到第 B 位（均为 1-based） */
+const sidebarOrderFrom = ref('')
+const sidebarOrderTo = ref('')
+const sidebarOrderError = ref('')
+
+function sidebarApplyReorder() {
+  sidebarOrderError.value = ''
+  const total = store.pages.length
+  const a = Math.floor(Number(String(sidebarOrderFrom.value).trim()))
+  const b = Math.floor(Number(String(sidebarOrderTo.value).trim()))
+  if (!Number.isFinite(a) || a < 1 || a > total) {
+    sidebarOrderError.value = `「从」须为 1～${total}`
+    return
+  }
+  if (!Number.isFinite(b) || b < 1 || b > total) {
+    sidebarOrderError.value = `「到」须为 1～${total}`
+    return
+  }
+  store.movePageToOneBasedPosition(a - 1, b)
+  sidebarOrderFrom.value = ''
+  sidebarOrderTo.value = ''
+}
+
+/** 批量：将选中页作为一段移动到指定起始页码（1-based） */
+const batchReorderTarget = ref('')
+
+function sidebarApplyBatchReorder() {
+  if (store.moveBatchSelectedPagesToOneBasedPosition(batchReorderTarget.value)) {
+    batchReorderTarget.value = ''
+    showToastMessage('已调整选中页顺序')
+  }
 }
 
 // 简单的 Toast 提示
@@ -202,6 +235,91 @@ const headerTitleBlockPresets = [
   '#EEF6FF',
   '#FFF4E6'
 ]
+
+/** 侧栏分组折叠状态（本地持久化，关闭面板后仍保留） */
+const SIDEBAR_SECTION_STORAGE_KEY = 'archie_sidebar_sections_v1'
+
+function defaultSidebarSections() {
+  return {
+    pageOrder: true,
+    header: true,
+    templatesStandard: true,
+    templatesProductWireless: true,
+    templatesProductComposite: true,
+    free: true,
+    exportTools: true
+  }
+}
+
+function loadSidebarSections() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_SECTION_STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return { ...defaultSidebarSections(), ...parsed }
+    }
+  } catch {
+    /* ignore */
+  }
+  return defaultSidebarSections()
+}
+
+const sidebarSectionOpen = ref(loadSidebarSections())
+
+watch(
+  sidebarSectionOpen,
+  (v) => {
+    try {
+      localStorage.setItem(SIDEBAR_SECTION_STORAGE_KEY, JSON.stringify(v))
+    } catch {
+      /* ignore */
+    }
+  },
+  { deep: true }
+)
+
+function toggleSidebarSection(key) {
+  sidebarSectionOpen.value = {
+    ...sidebarSectionOpen.value,
+    [key]: !sidebarSectionOpen.value[key]
+  }
+}
+
+function expandAllSidebarSections() {
+  sidebarSectionOpen.value = defaultSidebarSections()
+}
+
+function collapseAllSidebarSections() {
+  const all = defaultSidebarSections()
+  sidebarSectionOpen.value = Object.keys(all).reduce((acc, k) => {
+    acc[k] = false
+    return acc
+  }, {})
+}
+
+/** 侧栏双列分割（降低纵向高度，展开全部时更易一览） */
+const SIDEBAR_SPLIT_STORAGE_KEY = 'archie_sidebar_split_v1'
+
+function loadSidebarSplitMode() {
+  try {
+    const v = localStorage.getItem(SIDEBAR_SPLIT_STORAGE_KEY)
+    if (v === '0') return false
+    if (v === '1') return true
+  } catch {
+    /* ignore */
+  }
+  return true
+}
+
+const sidebarSplitMode = ref(loadSidebarSplitMode())
+
+watch(sidebarSplitMode, (on) => {
+  try {
+    localStorage.setItem(SIDEBAR_SPLIT_STORAGE_KEY, on ? '1' : '0')
+  } catch {
+    /* ignore */
+  }
+})
 </script>
 
 <template>
@@ -216,11 +334,15 @@ const headerTitleBlockPresets = [
 
   <div class="fixed top-5 right-5 z-50 flex flex-col gap-3 no-print" v-if="!store.printMode">
     <div
-      class="sidebar-panel p-4 rounded-2xl flex flex-col gap-2 w-48 max-h-[85vh] overflow-y-auto"
+      class="sidebar-panel rounded-2xl flex max-h-[85vh] min-h-0 flex-col overflow-hidden"
+      :class="sidebarSplitMode ? 'w-[min(94vw,30rem)]' : 'w-48'"
       v-if="showControls"
     >
       <div
-        class="sidebar-brand text-[color:var(--brand-purple)] font-black sticky top-0 z-10 flex items-center justify-between px-1"
+        class="sidebar-panel-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto overscroll-contain p-4 pb-5"
+      >
+      <div
+        class="sidebar-brand text-[color:var(--brand-purple)] font-black sticky top-0 z-10 flex shrink-0 items-center justify-between px-1"
       >
         <span>ARCHIE STUDIO</span>
         <button
@@ -232,14 +354,139 @@ const headerTitleBlockPresets = [
         </button>
       </div>
       
-      <div class="flex gap-2 mb-2">
+      <div class="mb-1 flex shrink-0 flex-wrap items-center justify-end gap-x-2 gap-y-1 px-0.5">
+        <button type="button" class="text-[9px] text-gray-500 hover:text-[#5e4585] font-medium" @click="expandAllSidebarSections">展开全部</button>
+        <span class="text-gray-300">|</span>
+        <button type="button" class="text-[9px] text-gray-500 hover:text-[#5e4585] font-medium" @click="collapseAllSidebarSections">收起全部</button>
+        <span class="text-gray-300">|</span>
+        <label class="inline-flex cursor-pointer select-none items-center gap-1 text-[9px] text-gray-600">
+          <input v-model="sidebarSplitMode" type="checkbox" class="rounded border-gray-400" />
+          分割双列
+        </label>
+      </div>
+
+      <div
+        class="min-h-0"
+        :class="sidebarSplitMode ? 'grid grid-cols-2 gap-2 items-start' : 'flex flex-col gap-2'"
+      >
+        <!-- 左列：页面 / 页眉 / 标准模板 -->
+        <div class="flex min-w-0 flex-col gap-2">
+      <!-- 页面与顺序 -->
+      <div class="sidebar-section mb-2 rounded-xl border border-gray-200/90 bg-white/40">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('pageOrder')"
+        >
+          <span class="text-[10px] font-bold text-gray-600">页面与顺序</span>
+          <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.pageOrder }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.pageOrder" class="px-2 pb-2 pt-0 space-y-2">
+      <div class="flex gap-2">
           <button @click="store.undo()" :disabled="!store.canUndo" class="btn-undo flex items-center justify-center flex-1">↩</button>
           <button @click="store.redo()" :disabled="!store.canRedo" class="btn-undo flex items-center justify-center flex-1">↪</button>
           <button @click="handleResetConfirm" class="btn-undo bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center flex-1" title="清空">🗑️</button>
       </div>
 
-      <div class="text-[10px] text-gray-400 font-bold uppercase px-1 mb-1">页眉（全页）</div>
-      <div class="flex flex-col gap-2 mb-2 text-[10px]">
+      <div v-if="store.pages.length" class="p-2 rounded-xl bg-gray-50 border border-gray-200">
+        <div class="text-[10px] text-gray-500 font-bold mb-1">调整顺序</div>
+        <div class="flex flex-wrap items-center gap-x-1 gap-y-1 text-[10px] text-gray-700">
+          <span>第</span>
+          <input
+            v-model="sidebarOrderFrom"
+            type="number"
+            min="1"
+            :max="store.pages.length"
+            class="w-9 px-1 py-0.5 border border-gray-200 rounded text-center text-[11px]"
+            placeholder="从"
+            @keyup.enter="sidebarApplyReorder"
+          >
+          <span>页 → 第</span>
+          <input
+            v-model="sidebarOrderTo"
+            type="number"
+            min="1"
+            :max="store.pages.length"
+            class="w-9 px-1 py-0.5 border border-gray-200 rounded text-center text-[11px]"
+            placeholder="到"
+            @keyup.enter="sidebarApplyReorder"
+          >
+          <span>位</span>
+          <button
+            type="button"
+            class="ml-auto px-2 py-0.5 rounded bg-[#5e4585] text-white text-[10px] font-bold"
+            @click="sidebarApplyReorder"
+          >
+            确定
+          </button>
+        </div>
+        <p v-if="sidebarOrderError" class="text-[9px] text-red-500 mt-1">{{ sidebarOrderError }}</p>
+      </div>
+
+      <div
+        v-if="store.pages.length"
+        class="rounded-xl border border-[#5e458533] bg-[#f5f3fa] p-2 text-[11px]"
+      >
+        <div class="font-bold text-[color:var(--brand-purple)] mb-1.5">多选页面</div>
+        <label class="flex items-center gap-2 cursor-pointer select-none mb-1.5 text-gray-800">
+          <input v-model="store.batchSelectMode" type="checkbox" class="rounded border-gray-400" />
+          批量选择
+        </label>
+        <div v-if="store.batchSelectMode" class="flex flex-col gap-1">
+          <button type="button" class="btn-tool py-1" @click="store.selectAllPagesBatch()">全选</button>
+          <button type="button" class="btn-tool py-1" @click="store.clearBatchPageSelection()">取消选中</button>
+          <button
+            type="button"
+            class="py-1.5 rounded-lg bg-red-50 text-red-600 border border-red-200 font-semibold disabled:opacity-40"
+            :disabled="store.batchSelectedPageIds.length === 0"
+            @click="store.removeSelectedPagesBatch()"
+          >
+            删除选中（{{ store.batchSelectedPageIds.length }}）
+          </button>
+          <div class="mt-2 pt-2 border-t border-dashed border-[#5e458533]">
+            <div class="text-[10px] text-gray-500 font-bold mb-1">批量调整顺序</div>
+            <p class="text-[9px] text-gray-500 leading-snug mb-1.5">
+              按当前顺序整段移动；起始位为移动后第一段选中页的新页码（1～总页数−选中数+1）
+            </p>
+            <div class="flex flex-wrap items-center gap-x-1 gap-y-1 text-[10px] text-gray-700">
+              <span>起始第</span>
+              <input
+                v-model="batchReorderTarget"
+                type="number"
+                min="1"
+                :max="Math.max(1, store.pages.length - store.batchSelectedPageIds.length + 1)"
+                class="w-10 px-1 py-0.5 border border-gray-200 rounded text-center text-[11px]"
+                placeholder="页"
+                @keyup.enter="sidebarApplyBatchReorder"
+              >
+              <span>页</span>
+              <button
+                type="button"
+                class="ml-auto px-2 py-0.5 rounded bg-[#5e4585] text-white text-[10px] font-bold disabled:opacity-40"
+                :disabled="store.batchSelectedPageIds.length === 0"
+                @click="sidebarApplyBatchReorder"
+              >
+                应用
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+        </div>
+      </div>
+
+      <!-- 页眉 -->
+      <div class="sidebar-section mb-2 rounded-xl border border-gray-200/90 bg-white/40">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('header')"
+        >
+          <span class="text-[10px] font-bold text-gray-600">页眉（全页）</span>
+          <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.header }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.header" class="px-2 pb-2 pt-0">
+      <div class="flex flex-col gap-2 text-[10px]">
         <label class="flex items-center gap-2 text-gray-600">
           <span class="w-8 shrink-0">颜色</span>
           <input
@@ -290,55 +537,120 @@ const headerTitleBlockPresets = [
           />
         </div>
       </div>
-      
-       <div class="text-[10px] text-gray-400 font-bold uppercase px-1 mb-1">📋 标准页面模板</div>
-       <div class="grid grid-cols-2 gap-2 text-[10px]">
-           <!-- 第1组: 封面和公司介绍 -->
+        </div>
+      </div>
+
+      <!-- 标准页面（非产品宫格） -->
+      <div class="sidebar-section mb-2 rounded-xl border border-gray-200/90 bg-white/40">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('templatesStandard')"
+        >
+          <span class="text-[10px] font-bold text-gray-600">📋 标准页面模板</span>
+          <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.templatesStandard }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.templatesStandard" class="px-2 pb-2 pt-0">
+       <div
+         class="grid gap-2 text-[10px]"
+         :class="sidebarSplitMode ? 'grid-cols-1' : 'grid-cols-2'"
+       >
            <button @click="addPageWithConfirm('cover')" class="btn-primary" title="PAGE 01: 封面页">📘 封面</button>
            <button @click="addPageWithConfirm('companyIntro')" class="btn-tool" title="PAGE 02: 公司简介页">🏢 公司简介</button>
-           
-           <!-- 第2组: 荣誉和合作伙伴 -->
            <button @click="addPageWithConfirm('certificates')" class="btn-tool" title="PAGE 03: 荣誉资质页 (4×2网格)">🏆 荣誉资质</button>
            <button @click="addPageWithConfirm('partners')" class="btn-tool" title="PAGE 04: 战略合作伙伴页 (3×5网格)">🤝 合作伙伴</button>
-           
-           <!-- 第3组: 工程案例和表面处理 -->
            <button @click="addPageWithConfirm('projectCases')" class="btn-tool" title="PAGE 05: 工程案例页 (3×3网格)">🏗️ 工程案例</button>
            <button @click="addPageWithConfirm('surfaceFinishes')" class="btn-tool" title="PAGE 06: 表面处理页 (6×6网格)">🌈 表面处理</button>
-           
-           <!-- 第4组: 目录和过渡页 -->
            <button @click="addPageWithConfirm('tableOfContents')" class="btn-tool" title="PAGE 07: 目录页">📑 目录</button>
            <button @click="addPageWithConfirm('divider')" class="btn-tool" title="PAGE 08: 过渡页">➖ 过渡页</button>
-           
-          <!-- 第5组: 智能门锁（第一行） -->
-          <button @click="addPageWithConfirm('productGrid', 'smartLock')" class="btn-success" title="PAGE 09/10: 智能门锁（无线图）(2×3网格)">🤖 智能门锁（无线图）</button>
-          <button @click="addPageWithConfirm('compositeProduct', 'smartLock')" class="btn-purple" title="PAGE 11/12: 智能门锁（有线图）(复合模式)">🤖 智能门锁（有线图）</button>
-          
-          <!-- 第6组: 门锁（第二行） -->
-          <button @click="addPageWithConfirm('productGrid', 'lock')" class="btn-success" title="PAGE 09/10: 门锁产品（无线图）(2×3网格)">🔒 门锁产品（无线图）</button>
-          <button @click="addPageWithConfirm('compositeProduct', 'lock')" class="btn-purple" title="PAGE 11/12: 门锁产品（有线图）(复合模式)">🔄 门锁产品（有线图）</button>
-          
-          <!-- 第7组: 其他五金（第三行） -->
-          <button @click="addPageWithConfirm('productGrid', 'hardware')" class="btn-success" title="PAGE 09/10: 其他五金产品（无线图）(2×3网格)">🛠 其他五金产品（无线图）</button>
-          <button @click="addPageWithConfirm('compositeProduct', 'hardware')" class="btn-purple" title="PAGE 11/12: 其他五金产品（有线图）(复合模式)">🛠 其他五金产品（有线图）</button>
-           
-           <!-- 第7组: 封底页 -->
-           <button @click="addPageWithConfirm('backCover')" class="btn-dark col-span-2" title="PAGE 13: 封底页">📕 封底</button>
+           <button
+             @click="addPageWithConfirm('backCover')"
+             class="btn-dark"
+             :class="sidebarSplitMode ? '' : 'col-span-2'"
+             title="PAGE 13: 封底页"
+           >📕 封底</button>
        </div>
-       
-       <div class="h-px bg-gray-200 my-1"></div>
-       
-       <div class="text-[10px] text-gray-400 font-bold uppercase px-1 mb-1">🎨 自由编辑</div>
+        </div>
+      </div>
+        </div>
+
+        <!-- 右列：产品 / 自由 / 导出 -->
+        <div class="flex min-w-0 flex-col gap-2">
+      <!-- 产品实拍（无线图） -->
+      <div class="sidebar-section mb-2 rounded-xl border border-emerald-200/70 bg-emerald-50/35">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('templatesProductWireless')"
+        >
+          <span class="text-[10px] font-bold text-emerald-900/90">产品实拍（无线图）</span>
+          <span class="sidebar-chevron text-emerald-700/60 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.templatesProductWireless }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.templatesProductWireless" class="px-2 pb-2 pt-0">
+       <div class="grid grid-cols-1 gap-2 text-[10px]">
+          <button @click="addPageWithConfirm('productGrid', 'smartLock')" class="btn-success" title="PAGE 09/10: 智能门锁（无线图）(2×3网格)">🤖 智能门锁（无线图）</button>
+          <button @click="addPageWithConfirm('productGrid', 'lock')" class="btn-success" title="PAGE 09/10: 门锁产品（无线图）(2×3网格)">🔒 门锁产品（无线图）</button>
+          <button @click="addPageWithConfirm('productGrid', 'hardware')" class="btn-success" title="PAGE 09/10: 其他五金产品（无线图）(2×3网格)">🛠 其他五金产品（无线图）</button>
+       </div>
+        </div>
+      </div>
+
+      <!-- 产品复合图解（有线图） -->
+      <div class="sidebar-section mb-2 rounded-xl border border-[#5e458533] bg-[#f5f3fa]/80">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('templatesProductComposite')"
+        >
+          <span class="text-[10px] font-bold text-[color:var(--brand-purple)]">产品复合图解（有线图）</span>
+          <span class="sidebar-chevron text-[#5e4585]/60 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.templatesProductComposite }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.templatesProductComposite" class="px-2 pb-2 pt-0">
+       <div class="grid grid-cols-1 gap-2 text-[10px]">
+          <button @click="addPageWithConfirm('compositeProduct', 'smartLock')" class="btn-purple" title="PAGE 11/12: 智能门锁（有线图）(复合模式)">🤖 智能门锁（有线图）</button>
+          <button @click="addPageWithConfirm('compositeProduct', 'lock')" class="btn-purple" title="PAGE 11/12: 门锁产品（有线图）(复合模式)">🔄 门锁产品（有线图）</button>
+          <button @click="addPageWithConfirm('compositeProduct', 'hardware')" class="btn-purple" title="PAGE 11/12: 其他五金产品（有线图）(复合模式)">🛠 其他五金产品（有线图）</button>
+       </div>
+        </div>
+      </div>
+
+      <!-- 自由编辑 -->
+      <div class="sidebar-section mb-2 rounded-xl border border-gray-200/90 bg-white/40">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('free')"
+        >
+          <span class="text-[10px] font-bold text-gray-600">🎨 自由编辑</span>
+          <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.free }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.free" class="px-2 pb-2 pt-0">
        <div class="grid grid-cols-1 gap-2 text-[10px]">
            <button @click="addPageWithConfirm('free')" class="btn-tool" title="自由编辑页">🎨 自由编辑页</button>
        </div>
-      
-      <div class="h-px bg-gray-200 my-1"></div>
+        </div>
+      </div>
+
+      <!-- 导出与数据 -->
+      <div class="sidebar-section mb-2 rounded-xl border border-gray-200/90 bg-white/40">
+        <button
+          type="button"
+          class="sidebar-section-head w-full flex items-center justify-between gap-2 px-2.5 py-2 text-left"
+          @click="toggleSidebarSection('exportTools')"
+        >
+          <span class="text-[10px] font-bold text-gray-600">导出与数据</span>
+          <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.exportTools }">▶</span>
+        </button>
+        <div v-show="sidebarSectionOpen.exportTools" class="px-2 pb-2 pt-0 space-y-2">
       
       <div class="flex gap-2">
           <button @click="store.showPrice = !store.showPrice" class="btn-toggle flex-1 text-xs" :class="store.showPrice?'active':''">{{ store.showPrice ? '✓ 报价' : '○ 报价' }}</button>
           <button @click="store.generatePageNumbers()" class="btn-orange-outline flex-1 text-[10px]"># 自动页码</button>
       </div>
-      <div class="grid grid-cols-2 gap-2 mt-1">
+      <div
+        class="grid gap-2 mt-1"
+        :class="sidebarSplitMode ? 'grid-cols-1' : 'grid-cols-2'"
+      >
           <button @click="store.triggerPrint()" class="btn-dark text-xs flex items-center justify-center gap-1">🖨 预览</button>
           <button @click="store.exportToPDF()" class="btn-success text-xs flex items-center justify-center gap-1" title="印刷级：系统打印到PDF（文字矢量，推荐）">📄 PDF</button>
       </div>
@@ -350,13 +662,24 @@ const headerTitleBlockPresets = [
           💡 提示：导入Excel后，直接将多张图片拖入屏幕即可自动匹配型号。
       </div>
 
-      <div class="grid grid-cols-2 gap-2 mt-2">
+      <div
+        class="grid gap-2 mt-2"
+        :class="sidebarSplitMode ? 'grid-cols-1' : 'grid-cols-2'"
+      >
           <button @click="store.exportProject()" class="btn-purple text-xs flex items-center justify-center gap-1">💾 存</button>
           <button @click="jsonInput.click()" class="btn-purple text-xs flex items-center justify-center gap-1">📂 读</button>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      <div
+        class="grid gap-2"
+        :class="sidebarSplitMode ? 'grid-cols-1' : 'grid-cols-2'"
+      >
           <button @click="downloadTemplate" class="btn-tool text-xs flex items-center justify-center gap-1">⬇ 模板</button>
           <button @click="excelInput.click()" class="btn-success text-xs flex items-center justify-center gap-1">📊 导入</button>
+      </div>
+        </div>
+      </div>
+        </div>
+      </div>
       </div>
     </div>
     
@@ -404,6 +727,17 @@ const headerTitleBlockPresets = [
 
 <style scoped>
 /* —— Apple 风：毛玻璃面板 + 品牌金紫渐变条 —— */
+/* 内层滚动：避免 flex+max-h 时子项撑开导致底部裁切、区块叠在一起 */
+.sidebar-panel-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-section {
+  position: relative;
+  isolation: isolate;
+  overflow: visible;
+}
+
 .sidebar-panel {
   background: linear-gradient(
     165deg,
@@ -440,6 +774,25 @@ const headerTitleBlockPresets = [
   border-radius: 2px;
   background: linear-gradient(90deg, #9a805e, rgba(154, 128, 94, 0.35), #5e4585);
   opacity: 0.9;
+}
+
+.sidebar-section-head {
+  background: rgba(255, 255, 255, 0.45);
+  transition: background 0.15s ease;
+}
+.sidebar-section-head:hover {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.sidebar-chevron {
+  display: inline-block;
+  font-size: 9px;
+  line-height: 1;
+  transition: transform 0.2s ease;
+  transform: rotate(0deg);
+}
+.sidebar-chevron--open {
+  transform: rotate(90deg);
 }
 
 .sidebar-toggle {

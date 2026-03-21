@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
 import { DEFAULT_CELL_CN, DEFAULT_CELL_EN } from '../../utils/pageTextDefaults'
+import { DEFAULT_IMAGE_OBJECT_FIT } from '../../utils/imageContainerDefaults.js'
 import A4Page from '../layout/A4Page.vue'
 import EditableText from '../ui/EditableText.vue'
 import ImageUploader from '../ui/ImageUploader.vue'
@@ -47,7 +48,7 @@ const casesList = computed(() => {
       scale: 1,
       opacity: 1,
       rotation: 0,
-      fit: 'cover',
+      fit: DEFAULT_IMAGE_OBJECT_FIT,
       position: '50% 50%'
     })
   }
@@ -60,7 +61,7 @@ const canAddCase = computed(() => filledCaseCount.value < MAX_CASES)
 const totalPages = computed(() => store.pages.length)
 
 /** 页眉与《最新页面代码.html》PAGE 05 一致 */
-const headerTitle = '2026 工程产品手册 / 经典工程案例'
+const headerTitle = '经典工程案例'
 
 function caseAt(index) {
   return casesList.value[index] || null
@@ -92,7 +93,7 @@ function ensureItem(index) {
       scale: 1,
       opacity: 1,
       rotation: 0,
-      fit: 'cover',
+      fit: DEFAULT_IMAGE_OBJECT_FIT,
       position: '50% 50%'
     })
   }
@@ -115,7 +116,7 @@ function addCaseCell() {
     scale: 1,
     opacity: 1,
     rotation: 0,
-    fit: 'cover',
+    fit: DEFAULT_IMAGE_OBJECT_FIT,
     position: '50% 50%'
   })
   // 优先恢复用户点 × 删除的格子，避免前面还有“从未用过”的空位时误激活第一格
@@ -155,7 +156,7 @@ function removeCaseCell(index) {
     scale: 1,
     opacity: 1,
     rotation: 0,
-    fit: 'cover',
+    fit: DEFAULT_IMAGE_OBJECT_FIT,
     position: '50% 50%'
   }
 }
@@ -165,7 +166,7 @@ function imageStyle(item) {
   const scale = item.scale ?? 1
   const rotation = item.rotation ?? 0
   const opacity = item.opacity ?? 1
-  const fit = item.fit || 'cover'
+  const fit = item.fit || DEFAULT_IMAGE_OBJECT_FIT
   const position = item.position || '50% 50%'
   return {
     transform: `scale(${scale}) rotate(${rotation}deg)`,
@@ -233,7 +234,7 @@ function cycleCaseFit(index) {
   const page = store.pages[props.pageIndex]
   const item = page?.items?.[index]
   if (!item) return
-  const cur = item.fit || 'cover'
+  const cur = item.fit || DEFAULT_IMAGE_OBJECT_FIT
   const next = cur === 'cover' ? 'contain' : cur === 'contain' ? 'fill' : 'cover'
   item.fit = next
 }

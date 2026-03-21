@@ -18,7 +18,7 @@ const pageData = computed(() => {
   return store.pages[props.pageIndex] || {}
 })
 
-const headerTitle = '2026 工程产品手册 / 公司概况'
+const headerTitle = '公司概况'
 
 function updateField(key, val) {
   if (!store.pages[props.pageIndex]) return

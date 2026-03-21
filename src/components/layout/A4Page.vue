@@ -55,7 +55,7 @@ const store = useCatalogStore()
 const headerText = computed(() => {
   const idx = props.pageIndex
   const page = typeof idx === 'number' && idx >= 0 ? store.pages[idx] : null
-  return page?.props?.headerText || props.pageTitle || '2026 工程产品手册'
+  return page?.props?.headerText || props.pageTitle || '工程产品手册'
 })
 
 const footerTemplate = computed(() => {
@@ -206,16 +206,20 @@ function updateFooterTemplate(val) {
   }
 }
 
-/* 横向页眉：右侧色块包字（阴影见 main.css .header-title-block） */
+/*
+ * 竖排页眉：右缘贴纸张右缘、上缘贴顶栏装饰线（main.css .page-header::before 高 2px）
+ */
 .header-title-block {
+  position: absolute;
+  right: 0;
+  top: 2px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  max-width: 100%;
-  margin-top: 3mm;
-  padding: 0.5em 1em;
-  border-radius: 8px;
+  justify-content: center;
+  max-width: calc(100% - var(--page-padding, 15mm));
+  padding: 0.75em 0.5em;
+  border-radius: 0 0 8px 8px;
   box-sizing: border-box;
-  transform: translate(2px, 0);
 }
 </style>

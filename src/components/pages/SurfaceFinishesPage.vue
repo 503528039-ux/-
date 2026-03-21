@@ -15,7 +15,7 @@ const pageData = computed(() => store.pages[props.pageIndex] || {})
 
 const displayTitle = computed(() => pageData.value.title || '质感美学')
 const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Surface Finishes')
-const headerTitle = '2026 工程产品手册 / 表面处理工艺'
+const headerTitle = '表面处理工艺'
 const totalPages = computed(() => store.pages.length)
 
 const intro = computed(

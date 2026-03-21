@@ -3,7 +3,7 @@
  */
 import { nanoid } from 'nanoid'
 import * as XLSX from 'xlsx'
-import { MAX_PRODUCT_GRID, createDefaultProductItem } from './productGridItems'
+import { createDefaultProductItem } from './productGridItems'
 
 function trimStr(v) {
   if (v == null) return ''
@@ -166,20 +166,4 @@ export function buildProductGridItemFromRow(row, subType) {
   }
 
   return item
-}
-
-/**
- * @param {unknown[]} chunk
- * @param {'smartLock'|'lock'|'hardware'} subType
- */
-export function padChunkToSix(chunk, subType) {
-  const out = chunk
-  while (out.length < MAX_PRODUCT_GRID) {
-    out.push({
-      ...createDefaultProductItem(subType, { composite: false }),
-      id: nanoid(),
-      deleted: false
-    })
-  }
-  return out
 }

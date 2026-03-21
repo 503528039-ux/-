@@ -1,5 +1,6 @@
 <script setup>
-import { onMounted, onUnmounted, ref, computed } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { scrollCatalogPageToIndex } from './utils/catalogPageScroll.js'
 import { useCatalogStore } from './stores/index'
 import TheSidebar from './components/TheSidebar.vue'
 import draggable from 'vuedraggable'
@@ -24,6 +25,34 @@ import PageHeader from './components/layout/PageHeader.vue'
 import PageFooter from './components/layout/PageFooter.vue'
 
 const store = useCatalogStore()
+
+/** 全局拖放占位（避免未定义） */
+function handleGlobalDrop(_e) {
+  /* 可后续接入批量导入 */
+}
+
+const gotoPageInput = ref('')
+const gotoPageError = ref('')
+
+function scrollToPageFromInput() {
+  gotoPageError.value = ''
+  const r = scrollCatalogPageToIndex(gotoPageInput.value, store.pages.length)
+  if (!r.ok) {
+    gotoPageError.value = r.message || '跳转失败'
+    return
+  }
+}
+
+/** 将指定页移到输入的目标顺序（1-based，与「第 N 页」一致） */
+function applyPageOrder(pageId) {
+  const fromIndex = store.pages.findIndex((p) => p.id === pageId)
+  if (fromIndex < 0) return
+  const el = document.getElementById('page-order-input-' + pageId)
+  if (!el) return
+  const raw = el.value
+  el.value = ''
+  store.movePageToOneBasedPosition(fromIndex, raw)
+}
 
 // 页面类型到组件的映射 - 基于最新页面代码.html设计规范
 const pageComponents = {
@@ -90,6 +119,42 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
        @drop.prevent="handleGlobalDrop($event, null, null)">
     
     <TheSidebar />
+
+    <!-- 左侧固定：批量选页 + 页码跳转 -->
+    <div
+      v-if="!store.printMode && store.pages.length > 0"
+      class="fixed left-4 top-24 z-[60] flex flex-col gap-2 no-print"
+    >
+      <button
+        type="button"
+        class="px-3 py-2 rounded-full bg-white border-2 border-[#5e4585] text-[#5e4585] text-xs font-bold shadow-lg hover:bg-[#f5f3fa]"
+        @click="store.batchSelectMode = !store.batchSelectMode"
+      >
+        {{ store.batchSelectMode ? '退出批量' : '批量选页' }}
+      </button>
+      <div class="w-[148px] rounded-xl bg-white/95 border border-gray-200 shadow-md p-2">
+        <div class="text-[10px] font-semibold text-gray-600 mb-1">跳转页码</div>
+        <div class="flex gap-1 items-center">
+          <input
+            v-model="gotoPageInput"
+            type="number"
+            min="1"
+            :max="store.pages.length"
+            placeholder="1"
+            class="w-14 min-w-0 px-1.5 py-1 text-sm border border-gray-200 rounded"
+            @keyup.enter="scrollToPageFromInput"
+          >
+          <button
+            type="button"
+            class="shrink-0 px-2 py-1 text-[11px] font-semibold bg-[#5e4585] text-white rounded hover:opacity-90"
+            @click="scrollToPageFromInput"
+          >
+            跳转
+          </button>
+        </div>
+        <p v-if="gotoPageError" class="text-[10px] text-red-500 mt-1 leading-tight">{{ gotoPageError }}</p>
+      </div>
+    </div>
     
     <!-- 空状态提示 -->
     <div v-if="!store.printMode && store.pages.length === 0" class="w-full max-w-4xl mx-auto mb-12 p-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 text-center">
@@ -111,10 +176,28 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
       @end="store.recordDragEnd()"
     >
        <template #item="{ element: page, index }">
-        <div class="page-outer-wrapper relative group print:shadow-none print:m-0 overflow-hidden flex flex-col mx-auto transition-all duration-300"
+        <div
+            :id="'catalog-page-' + (index + 1)"
+            class="page-outer-wrapper relative group print:shadow-none print:m-0 overflow-hidden flex flex-col mx-auto transition-all duration-300"
              :class="page.type === 'cover' ? 'shadow-xl' : 'bg-white shadow-xl'"
-             :style="{ width: page.width + 'mm', height: page.height + 'mm' }">
+             :style="{ width: page.width + 'mm', height: page.height + 'mm' }"
+        >
           
+          <!-- 批量勾选 -->
+          <label
+            v-if="!store.printMode && store.batchSelectMode"
+            class="absolute top-4 left-4 z-[60] flex items-center gap-2 no-print cursor-pointer select-none bg-white/90 rounded-full px-2 py-1 shadow border border-gray-200"
+            @click.stop
+          >
+            <input
+              type="checkbox"
+              class="rounded border-gray-400"
+              :checked="store.isBatchPageSelected(page.id)"
+              @change="store.setBatchPageSelected(page.id, $event.target.checked)"
+            />
+            <span class="text-xs text-gray-600">第 {{ index + 1 }} 页</span>
+          </label>
+
           <!-- 页面操作工具栏 -->
           <div v-if="!store.printMode" class="absolute top-4 -right-12 group-hover:right-4 transition-all duration-300 flex flex-col gap-2 no-print z-50">
             <div class="w-8 h-8 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center text-xs font-bold">{{ index + 1 }}</div>
@@ -122,6 +205,26 @@ onUnmounted(() => window.removeEventListener('keydown', handleKeydown))
             <button @click="store.movePage(index, -1)" class="w-8 h-8 bg-white text-gray-600 rounded-full shadow flex items-center justify-center hover:bg-gray-50">↑</button>
             <button @click="store.movePage(index, 1)" class="w-8 h-8 bg-white text-gray-600 rounded-full shadow flex items-center justify-center hover:bg-gray-50">↓</button>
             <button @click="store.removePage(index)" class="w-8 h-8 bg-white text-red-500 border border-red-200 rounded-full shadow flex items-center justify-center hover:bg-red-50">×</button>
+            <div class="mt-1 pt-1.5 border-t border-gray-100 flex flex-col items-center gap-0.5 w-10">
+              <span class="text-[8px] text-gray-400 text-center leading-tight">移到第</span>
+              <input
+                :id="'page-order-input-' + page.id"
+                type="number"
+                :min="1"
+                :max="store.pages.length"
+                class="w-9 h-7 text-center text-[10px] border border-gray-200 rounded tabular-nums"
+                :placeholder="String(index + 1)"
+                @keyup.enter="applyPageOrder(page.id)"
+              >
+              <button
+                type="button"
+                class="w-9 h-6 text-[9px] font-semibold bg-white border border-gray-200 rounded hover:bg-gray-50 text-gray-700"
+                title="移动到该序号"
+                @click="applyPageOrder(page.id)"
+              >
+                移动
+              </button>
+            </div>
           </div>
           
           <!-- 动态组件渲染 -->

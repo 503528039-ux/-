@@ -10,6 +10,7 @@ export * from './types'
 import { AddPageCommand } from './AddPageCommand'
 import { MovePageCommand } from './MovePageCommand'
 import { RemovePageCommand } from './RemovePageCommand'
+import { ReorderPagesCommand } from './ReorderPagesCommand'
 import { ResetDataCommand } from './ResetDataCommand'
 import { PageStore, PageType, PageSubType, PageData } from './types'
 import { CommandManager } from '../types'
@@ -19,6 +20,7 @@ export {
   AddPageCommand, 
   MovePageCommand, 
   RemovePageCommand,
+  ReorderPagesCommand,
   ResetDataCommand
 }
 
@@ -39,6 +41,13 @@ export function createMovePageCommand(
   toIndex: number
 ) {
   return new MovePageCommand(store, fromIndex, toIndex)
+}
+
+export function createReorderPagesCommand(
+  store: PageStore,
+  nextPages: PageData[]
+) {
+  return new ReorderPagesCommand(store, nextPages)
 }
 
 // 工厂函数：创建删除页面命令

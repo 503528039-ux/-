@@ -5,6 +5,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 跳转页码定位时短暂高亮（见 catalogPageScroll.js） */
+.catalog-page-jump-highlight {
+    outline: 3px solid rgba(94, 69, 133, 0.55);
+    outline-offset: 6px;
+    border-radius: 2px;
+    transition: outline 0.15s ease;
+}
+
 /* ==========================================================================
    1. 全局核心样式 (Global CSS) - 严格对齐最新页面代码.html
    ========================================================================== */
@@ -183,6 +191,8 @@ p {
     white-space: nowrap;
     overflow: visible;
     text-overflow: clip;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
 }
 
 .page-footer {

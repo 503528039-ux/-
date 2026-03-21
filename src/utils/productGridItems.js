@@ -2,6 +2,7 @@
  * 六宫格产品页（无线图 / 复合图解）固定槽位与默认条目
  * 与 AddPageCommand 中 productGrid、compositeProduct 模板对齐
  */
+import { nanoid } from 'nanoid'
 
 export const MAX_PRODUCT_GRID = 6
 
@@ -67,6 +68,18 @@ export function isProductSlotFilled(p) {
   if (trimStr(p.name) || trimStr(p.model)) return true
   if (Array.isArray(p.specs) && p.specs.some((s) => s && trimStr(s.value))) return true
   return false
+}
+
+/**
+ * 补齐网格时的空槽（非示例占位）：deleted + 空内容；用户可点「新增一格」或编辑激活为默认产品
+ * @param {string} subType
+ * @param {{ composite?: boolean }} opts
+ */
+export function createEmptyGridSlot(subType = 'lock', opts = {}) {
+  const composite = !!opts.composite
+  const slot = clearedProductSlot({}, subType, { composite })
+  slot.id = nanoid()
+  return slot
 }
 
 /** 删除占位：清空内容，保留 specs 行结构（标签保留，值清空） */

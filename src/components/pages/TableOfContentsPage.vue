@@ -144,7 +144,7 @@ function removeTocItem(index: number) {
 <template>
   <A4Page
     :page-index="props.pageIndex"
-    page-title="2026 工程产品手册 / 总目录"
+    page-title="总目录"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
     :show-header="false"

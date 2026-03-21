@@ -51,7 +51,7 @@ const canAddPartner = computed(() => filledPartnerCount.value < MAX_PARTNERS)
 const totalPages = computed(() => store.pages.length)
 
 /** 与 HTML PAGE 04 一致 */
-const headerTitle = '2026 工程产品手册 / 战略合作伙伴'
+const headerTitle = '战略合作伙伴'
 
 function updatePartnerImage(index, src) {
   if (!Array.isArray(pageData.value.items)) return

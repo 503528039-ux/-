@@ -14,6 +14,7 @@ import { DEFAULT_CELL_CN } from '../utils/pageTextDefaults'
 import ImageUploader from './ui/ImageUploader.vue'
 import EditableText from './ui/EditableText.vue'
 import type { Product, SpecItem } from '../data/catalog'
+import { DEFAULT_IMAGE_OBJECT_FIT } from '../utils/imageContainerDefaults.js'
 
 const store = useCatalogStore()
 
@@ -299,7 +300,7 @@ function onRemoveClick() {
         :src="data.image"
         :alt="data.name"
         class="product-img"
-        :style="imageStyle(getImageTransform('image', 'cover'), 'cover')"
+        :style="imageStyle(getImageTransform('image', DEFAULT_IMAGE_OBJECT_FIT), DEFAULT_IMAGE_OBJECT_FIT)"
       >
       <div v-else class="image-placeholder">
         <span class="placeholder-text">{{ data.model }}</span>
@@ -310,12 +311,12 @@ function onRemoveClick() {
         @update:src="(src) => setProductField('image', src)"
       />
       <div v-if="canEditImages && hasImage" class="img-tools">
-        <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
-        <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
-        <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
-        <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
-        <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
-        <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
+        <button type="button" @click.stop="updateImageScale('image', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">＋</button>
+        <button type="button" @click.stop="updateImageScale('image', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">－</button>
+        <button type="button" @click.stop="updateImageRotation('image', -5, DEFAULT_IMAGE_OBJECT_FIT)">↺</button>
+        <button type="button" @click.stop="updateImageRotation('image', 5, DEFAULT_IMAGE_OBJECT_FIT)">↻</button>
+        <button type="button" @click.stop="updateImageOpacity('image', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">淡</button>
+        <button type="button" @click.stop="updateImageOpacity('image', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">浓</button>
         <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
       </div>
     </div>
@@ -332,7 +333,7 @@ function onRemoveClick() {
             v-if="hasImage"
             :src="data.image"
             :alt="data.name"
-            :style="imageStyle(getImageTransform('image', 'cover'), 'cover')"
+            :style="imageStyle(getImageTransform('image', DEFAULT_IMAGE_OBJECT_FIT), DEFAULT_IMAGE_OBJECT_FIT)"
           >
           <div v-else class="image-placeholder mini">
             <span class="placeholder-text">产品图</span>
@@ -343,12 +344,12 @@ function onRemoveClick() {
             @update:src="(src) => setProductField('image', src)"
           />
           <div v-if="canEditImages && hasImage" class="img-tools">
-            <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
-            <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
-            <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
-            <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
-            <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
-            <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
+            <button type="button" @click.stop="updateImageScale('image', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">＋</button>
+            <button type="button" @click.stop="updateImageScale('image', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">－</button>
+            <button type="button" @click.stop="updateImageRotation('image', -5, DEFAULT_IMAGE_OBJECT_FIT)">↺</button>
+            <button type="button" @click.stop="updateImageRotation('image', 5, DEFAULT_IMAGE_OBJECT_FIT)">↻</button>
+            <button type="button" @click.stop="updateImageOpacity('image', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">淡</button>
+            <button type="button" @click.stop="updateImageOpacity('image', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">浓</button>
             <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
           </div>
         </div>
@@ -363,7 +364,7 @@ function onRemoveClick() {
             v-if="hasLineImage"
             :src="data.lineImage"
             :alt="`${data.name} 线图`"
-            :style="imageStyle(getImageTransform('line', 'cover'), 'cover')"
+            :style="imageStyle(getImageTransform('line', DEFAULT_IMAGE_OBJECT_FIT), DEFAULT_IMAGE_OBJECT_FIT)"
           >
           <div v-else class="image-placeholder mini">
             <span class="placeholder-text">线图</span>
@@ -374,12 +375,12 @@ function onRemoveClick() {
             @update:src="(src) => setProductField('lineImage', src)"
           />
           <div v-if="canEditImages && hasLineImage" class="img-tools">
-            <button type="button" @click.stop="updateImageScale('line', 0.1, 'contain')">＋</button>
-            <button type="button" @click.stop="updateImageScale('line', -0.1, 'contain')">－</button>
-            <button type="button" @click.stop="updateImageRotation('line', -5, 'contain')">↺</button>
-            <button type="button" @click.stop="updateImageRotation('line', 5, 'contain')">↻</button>
-            <button type="button" @click.stop="updateImageOpacity('line', -0.1, 'contain')">淡</button>
-            <button type="button" @click.stop="updateImageOpacity('line', 0.1, 'contain')">浓</button>
+            <button type="button" @click.stop="updateImageScale('line', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">＋</button>
+            <button type="button" @click.stop="updateImageScale('line', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">－</button>
+            <button type="button" @click.stop="updateImageRotation('line', -5, DEFAULT_IMAGE_OBJECT_FIT)">↺</button>
+            <button type="button" @click.stop="updateImageRotation('line', 5, DEFAULT_IMAGE_OBJECT_FIT)">↻</button>
+            <button type="button" @click.stop="updateImageOpacity('line', -0.1, DEFAULT_IMAGE_OBJECT_FIT)">淡</button>
+            <button type="button" @click.stop="updateImageOpacity('line', 0.1, DEFAULT_IMAGE_OBJECT_FIT)">浓</button>
             <button type="button" @click.stop="cycleFit('lineFit')">适配</button>
           </div>
         </div>

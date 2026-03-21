@@ -122,7 +122,7 @@ export const useCatalogStore = defineStore('catalog', () => {
       page.props = {
         title: '权威认证与资质',
         subtitle: 'Certificates & Honors',
-        headerTitle: '2026 工程产品手册 / 荣誉与资质',
+        headerTitle: '荣誉与资质',
         footerText: '- PAGE 03 -',
         certificates: [
           {
@@ -370,6 +370,26 @@ export const useCatalogStore = defineStore('catalog', () => {
       } 
   }
 
+  /** 移动到指定顺序（1-based） */
+  function movePageToOneBasedPosition(fromIndex, targetPosition1Based) {
+    const total = pages.value.length
+    if (total < 1) return
+    if (fromIndex < 0 || fromIndex >= total) return
+    const raw = String(targetPosition1Based ?? '').trim()
+    if (!raw) return
+    const pos = Math.floor(Number(raw))
+    if (!Number.isFinite(pos) || pos < 1 || pos > total) {
+      alert(`请输入 1～${total} 的整数`)
+      return
+    }
+    const toIndex = pos - 1
+    if (fromIndex === toIndex) return
+    recordSnapshot()
+    const p = pages.value[fromIndex]
+    pages.value.splice(fromIndex, 1)
+    pages.value.splice(toIndex, 0, p)
+  }
+
   // 新版addPage：支持新页面类型和props
   function addPage(pageType, props = {}) {
     recordSnapshot();
@@ -384,6 +404,54 @@ export const useCatalogStore = defineStore('catalog', () => {
       pages.value.splice(index, 1);
     }
   }
+
+  /** 按页面 id 批量删除 */
+  function removePagesByIds(ids) {
+    const unique = [...new Set((ids || []).filter(Boolean))]
+    if (unique.length === 0) return false
+    const existing = unique.filter((id) => pages.value.some((p) => p.id === id))
+    if (existing.length === 0) return false
+    if (!confirm(`确定删除选中的 ${existing.length} 页？`)) return false
+    recordSnapshot()
+    const indices = existing
+      .map((id) => pages.value.findIndex((p) => p.id === id))
+      .filter((i) => i >= 0)
+      .sort((a, b) => b - a)
+    for (const i of indices) {
+      pages.value.splice(i, 1)
+    }
+    return true
+  }
+
+  const batchSelectMode = ref(false)
+  const batchSelectedPageIds = ref([])
+  function isBatchPageSelected(id) {
+    return batchSelectedPageIds.value.includes(id)
+  }
+  function setBatchPageSelected(id, checked) {
+    if (checked) {
+      if (!batchSelectedPageIds.value.includes(id)) {
+        batchSelectedPageIds.value = [...batchSelectedPageIds.value, id]
+      }
+    } else {
+      batchSelectedPageIds.value = batchSelectedPageIds.value.filter((x) => x !== id)
+    }
+  }
+  function selectAllPagesBatch() {
+    batchSelectedPageIds.value = pages.value.map((p) => p.id)
+  }
+  function clearBatchPageSelection() {
+    batchSelectedPageIds.value = []
+  }
+  function removeSelectedPagesBatch() {
+    const ids = [...batchSelectedPageIds.value]
+    if (ids.length === 0) return
+    if (removePagesByIds(ids)) batchSelectedPageIds.value = []
+  }
+
+  watch(batchSelectMode, (on) => {
+    if (!on) batchSelectedPageIds.value = []
+  })
   
   // 更新页面数据
   function updatePageData(index, data) {
@@ -840,8 +908,17 @@ export const useCatalogStore = defineStore('catalog', () => {
     batchMatchImages,
     resetData,
     movePage,
+    movePageToOneBasedPosition,
     addPage,
     removePage,
+    removePagesByIds,
+    batchSelectMode,
+    batchSelectedPageIds,
+    isBatchPageSelected,
+    setBatchPageSelected,
+    selectAllPagesBatch,
+    clearBatchPageSelection,
+    removeSelectedPagesBatch,
     updatePageData,
     addBlock,
     removeBlock,

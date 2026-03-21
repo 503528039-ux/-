@@ -7,7 +7,7 @@ import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
 import {
   MAX_PRODUCT_GRID,
-  createDefaultProductItemForPage,
+  createEmptyGridSlot,
   clearedProductSlot,
   resetProductSlot,
   isProductSlotFilled
@@ -29,8 +29,9 @@ const productsList = computed(() => {
   if (!page) return []
   if (!Array.isArray(page.items)) page.items = []
   const items = page.items as Record<string, unknown>[]
+  const sub = (page.subType as string) || 'lock'
   while (items.length < MAX_PRODUCT_GRID) {
-    items.push(createDefaultProductItemForPage(page, { composite: false }))
+    items.push(createEmptyGridSlot(sub, { composite: false }))
   }
   return items.slice(0, MAX_PRODUCT_GRID)
 })

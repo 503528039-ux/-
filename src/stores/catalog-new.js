@@ -15,6 +15,7 @@ import {
   createAddPageCommand,
   createMovePageCommand,
   createRemovePageCommand,
+  createReorderPagesCommand,
   createResetDataCommand
 } from '../commands'
 
@@ -24,14 +25,64 @@ import { normalizeCatalogPages } from '../utils/pageTextDefaults'
 
 // 导入页面模板工具
 import { getInitialPageData } from '../config/pageTemplates'
-import { MAX_PRODUCT_GRID } from '../utils/productGridItems'
+import { MAX_PRODUCT_GRID, isProductSlotFilled } from '../utils/productGridItems'
 import {
   parseSheetToProductRows,
   parseCategoryFromExcelRow,
   buildProductGridItemFromRow,
-  getProductGridPageMeta,
-  padChunkToSix
+  getProductGridPageMeta
 } from '../utils/excelProductImport'
+
+/**
+ * 文档末尾「临近」同品类：仅最后一页为 productGrid 且 subType 一致时可并入
+ * @param {unknown[]} pagesArr
+ * @param {'smartLock'|'lock'|'hardware'} subType
+ */
+function findTrailingMergeTailPage(pagesArr, subType) {
+  if (!Array.isArray(pagesArr) || pagesArr.length === 0) return null
+  const p = pagesArr[pagesArr.length - 1]
+  if (!p || p.type !== 'productGrid' || p.subType !== subType) return null
+  return p
+}
+
+/**
+ * 当前页还可放入几个真实产品（稀疏 items 或未满 6；满 6 时数空槽 / deleted）
+ */
+function countAvailableProductSlots(page) {
+  if (!page) return 0
+  if (!Array.isArray(page.items)) page.items = []
+  const items = page.items
+  if (items.length < MAX_PRODUCT_GRID) return MAX_PRODUCT_GRID - items.length
+  let empty = 0
+  for (const slot of items) {
+    if (!slot || slot.deleted || !isProductSlotFilled(slot)) empty++
+  }
+  return empty
+}
+
+/**
+ * 将产品对象并入 page，返回剩余未放入的
+ * @param {Record<string, unknown>} page
+ * @param {unknown[]} products
+ */
+function appendProductsToMergePage(page, products) {
+  let remaining = [...products]
+  while (remaining.length > 0) {
+    if (countAvailableProductSlots(page) === 0) break
+    const take = remaining.shift()
+    if (!page.items) page.items = []
+    if (page.items.length < MAX_PRODUCT_GRID) {
+      page.items.push(take)
+      continue
+    }
+    const idx = page.items.findIndex(
+      (slot) => !slot || slot.deleted || !isProductSlotFilled(slot)
+    )
+    if (idx === -1) break
+    page.items[idx] = take
+  }
+  return remaining
+}
 
 // 环境变量，控制是否使用命令模式
 const USE_COMMANDS = true
@@ -473,6 +524,50 @@ export const useCatalogStore = defineStore('catalog', () => {
   }
 
   /**
+   * 将页面移动到指定顺序（1-based，与界面「第 N 页」一致）
+   * @param {number} fromIndex 当前页在列表中的索引
+   * @param {number|string} targetPosition1Based 目标位置 1..length
+   */
+  function movePageToOneBasedPosition(fromIndex, targetPosition1Based) {
+    const total = pages.value.length
+    if (total < 1) return
+    if (fromIndex < 0 || fromIndex >= total) return
+    const raw = String(targetPosition1Based ?? '').trim()
+    if (!raw) return
+    const pos = Math.floor(Number(raw))
+    if (!Number.isFinite(pos) || pos < 1 || pos > total) {
+      alert(`请输入 1～${total} 的整数`)
+      return
+    }
+    const toIndex = pos - 1
+    if (fromIndex === toIndex) return
+
+    const adapter = {
+      getPages: () => pages.value,
+      setPages: (newPages) => {
+        pages.value = newPages
+      },
+      _addPage: _addPage,
+      _removePage: _removePage,
+      _movePage: _movePage,
+      _updatePage: _updatePage
+    }
+
+    if (useCommandMode.value) {
+      const command = createMovePageCommand(adapter, fromIndex, toIndex)
+      const result = commandManager.execute(command)
+      if (!result.success) {
+        console.error('移动页面失败:', result.error)
+      }
+    } else {
+      recordSnapshot()
+      const p = pages.value[fromIndex]
+      pages.value.splice(fromIndex, 1)
+      pages.value.splice(toIndex, 0, p)
+    }
+  }
+
+  /**
    * 插入页面
    * @param type 页面类型
    * @param index 插入位置（可选，默认插入到末尾）
@@ -566,6 +661,155 @@ export const useCatalogStore = defineStore('catalog', () => {
       recordSnapshot(); 
       pages.value.splice(i, 1); 
     }
+  }
+
+  /**
+   * 按页面 id 批量删除（用于多选删除）
+   * @param {string[]} ids
+   */
+  function removePagesByIds(ids, options = {}) {
+    const skipConfirm = options.skipConfirm === true
+    const unique = [...new Set((ids || []).filter(Boolean))]
+    if (unique.length === 0) return false
+
+    const existing = unique.filter((id) => pages.value.some((p) => p.id === id))
+    if (existing.length === 0) return false
+    if (!skipConfirm && !confirm(`确定删除选中的 ${existing.length} 页？`)) return false
+
+    const adapter = {
+      getPages: () => pages.value,
+      setPages: (newPages) => {
+        pages.value = newPages
+      },
+      _addPage: _addPage,
+      _removePage: _removePage,
+      _movePage: _movePage,
+      _updatePage: _updatePage
+    }
+
+    if (useCommandMode.value) {
+      for (const pageId of existing) {
+        const command = createRemovePageCommand(adapter, pageId)
+        const result = commandManager.execute(command)
+        if (!result.success) {
+          console.error('批量删除失败:', result.error)
+          return false
+        }
+      }
+    } else {
+      recordSnapshot()
+      const indices = existing
+        .map((id) => pages.value.findIndex((p) => p.id === id))
+        .filter((i) => i >= 0)
+        .sort((a, b) => b - a)
+      for (const i of indices) {
+        pages.value.splice(i, 1)
+      }
+    }
+    return true
+  }
+
+  /** 批量选择页面（UI 状态，供侧栏与顶部条共用） */
+  const batchSelectMode = ref(false)
+  const batchSelectedPageIds = ref([])
+
+  watch(batchSelectMode, (on) => {
+    if (!on) batchSelectedPageIds.value = []
+  })
+
+  function isBatchPageSelected(id) {
+    return batchSelectedPageIds.value.includes(id)
+  }
+
+  function setBatchPageSelected(id, checked) {
+    if (checked) {
+      if (!batchSelectedPageIds.value.includes(id)) {
+        batchSelectedPageIds.value = [...batchSelectedPageIds.value, id]
+      }
+    } else {
+      batchSelectedPageIds.value = batchSelectedPageIds.value.filter((x) => x !== id)
+    }
+  }
+
+  function selectAllPagesBatch() {
+    batchSelectedPageIds.value = pages.value.map((p) => p.id)
+  }
+
+  function clearBatchPageSelection() {
+    batchSelectedPageIds.value = []
+  }
+
+  /** 删除当前勾选 */
+  function removeSelectedPagesBatch() {
+    const ids = [...batchSelectedPageIds.value]
+    if (ids.length === 0) return
+    if (removePagesByIds(ids)) batchSelectedPageIds.value = []
+  }
+
+  /**
+   * 将批量选中的页面按当前文档顺序作为一整段，移动到「起始页码」（1-based）
+   * 例如选中第 5、7、8 页，起始位 2，则这三页依次变为第 2、3、4 页。
+   * @param {number|string} targetPosition1Based
+   * @returns {boolean}
+   */
+  function moveBatchSelectedPagesToOneBasedPosition(targetPosition1Based) {
+    const ids = [...batchSelectedPageIds.value]
+    if (ids.length === 0) {
+      alert('请先勾选要移动的页面（开启批量选择并勾选页面）')
+      return false
+    }
+
+    const total = pages.value.length
+    const unique = [...new Set(ids)]
+    const sortedIds = unique.sort((a, b) => {
+      return pages.value.findIndex((p) => p.id === a) - pages.value.findIndex((p) => p.id === b)
+    })
+    const k = sortedIds.length
+
+    const raw = String(targetPosition1Based ?? '').trim()
+    if (!raw) {
+      alert('请输入目标起始页码')
+      return false
+    }
+    const pos = Math.floor(Number(raw))
+    if (!Number.isFinite(pos) || pos < 1 || pos > total - k + 1) {
+      alert(`目标起始位须为 1～${total - k + 1}（选中 ${k} 页）`)
+      return false
+    }
+
+    const toIndex = pos - 1
+    const idSet = new Set(sortedIds)
+    const moved = sortedIds.map((id) => pages.value.find((p) => p.id === id))
+    if (moved.some((x) => !x)) return false
+
+    const rest = pages.value.filter((p) => !idSet.has(p.id))
+    const newPages = [...rest.slice(0, toIndex), ...moved, ...rest.slice(toIndex)]
+
+    const adapter = {
+      getPages: () => pages.value,
+      setPages: (np) => {
+        pages.value = np
+      },
+      _addPage: _addPage,
+      _removePage: _removePage,
+      _movePage: _movePage,
+      _updatePage: _updatePage
+    }
+
+    if (useCommandMode.value) {
+      const command = createReorderPagesCommand(adapter, newPages)
+      const result = commandManager.execute(command)
+      if (!result.success) {
+        console.error('批量调整顺序失败:', result.error)
+        return false
+      }
+    } else {
+      recordSnapshot()
+      pages.value = newPages
+    }
+
+    batchSelectedPageIds.value = []
+    return true
   }
 
   /**
@@ -727,21 +971,31 @@ export const useCatalogStore = defineStore('catalog', () => {
 
         const flush = (subType) => {
           if (chunk.length === 0) return
-          padChunkToSix(chunk, subType)
-          const { title, sub } = getProductGridPageMeta(subType)
-          pages.value.push({
-            id: nanoid(),
-            type: 'productGrid',
-            subType,
-            title,
-            sub,
-            subtitle: sub,
-            items: JSON.parse(JSON.stringify(chunk)),
-            width: 210,
-            height: 297
-          })
-          pageCount += 1
+          let remaining = chunk.map((item) => JSON.parse(JSON.stringify(item)))
           chunk.length = 0
+
+          const mergePage = findTrailingMergeTailPage(pages.value, subType)
+          if (mergePage && countAvailableProductSlots(mergePage) > 0) {
+            remaining = appendProductsToMergePage(mergePage, remaining)
+          }
+
+          const { title, sub } = getProductGridPageMeta(subType)
+          while (remaining.length > 0) {
+            const pageChunk = remaining.slice(0, MAX_PRODUCT_GRID)
+            remaining = remaining.slice(MAX_PRODUCT_GRID)
+            pages.value.push({
+              id: nanoid(),
+              type: 'productGrid',
+              subType,
+              title,
+              sub,
+              subtitle: sub,
+              items: JSON.parse(JSON.stringify(pageChunk)),
+              width: 210,
+              height: 297
+            })
+            pageCount += 1
+          }
         }
 
         for (const row of rows) {
@@ -773,7 +1027,9 @@ export const useCatalogStore = defineStore('catalog', () => {
           return
         }
 
-        alert(`导入成功！已添加 ${pageCount} 个产品页（六宫格，按品类分页）。`)
+        alert(
+          `导入成功！已添加 ${pageCount} 个产品页（每页最多 6 个；不足一页不补占位；末尾同品类未满页会并入；按品类分页）。`
+        )
       } catch (err) {
         console.error('Excel导入失败:', err)
         alert('Excel导入失败，请检查文件格式')
@@ -1142,6 +1398,15 @@ export const useCatalogStore = defineStore('catalog', () => {
     showPrice,
     printMode,
     clipboardBlock,
+
+    batchSelectMode,
+    batchSelectedPageIds,
+    isBatchPageSelected,
+    setBatchPageSelected,
+    selectAllPagesBatch,
+    clearBatchPageSelection,
+    removeSelectedPagesBatch,
+    moveBatchSelectedPagesToOneBasedPosition,
     
     // 历史记录相关
     undo,
@@ -1152,7 +1417,9 @@ export const useCatalogStore = defineStore('catalog', () => {
     // 页面操作
     addPage,
     removePage,
+    removePagesByIds,
     movePage,
+    movePageToOneBasedPosition,
     
     // 块操作
     addBlock,

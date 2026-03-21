@@ -15,7 +15,7 @@ const props = defineProps({
   /** 页面标题（右对齐显示） */
   title: {
     type: String,
-    default: '2026 工程产品手册'
+    default: '工程产品手册'
   },
 
   /** 页面副标题/分类（可选，用于显示如 "/ 门锁五金系列"） */
@@ -92,7 +92,9 @@ const headerStyle = computed(() => ({
   /* 字体族 */
   font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
 
-  /* 防止换行 */
+  /* 竖排（与 main.css / A4 页眉一致） */
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
   white-space: nowrap;
 }
 

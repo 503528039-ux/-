@@ -35,7 +35,7 @@ const canAddCert = computed(() => {
 })
 
 /** 与 HTML PAGE 03 页眉一致 */
-const headerTitle = '2026 工程产品手册 / 荣誉与资质'
+const headerTitle = '荣誉与资质'
 
 function updateTitle(val) {
   const page = store.pages[props.pageIndex]
