@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 .venv/
+.venv-ocr311/
+extracted/
 .DS_Store
 dist
 dist-ssr
@@ -36,9 +38,16 @@ coverage
 !2026年图册编制/*.xls
 ~$*.xlsx
 
+# 大型本地原稿（不推送到远程）
+雅洁全系列画册5.0.pdf
+
 # Cypress
 /cypress/videos/
 /cypress/screenshots/
 
 # Vitest
 __screenshots__/
+
+# Python
+__pycache__/
+*.pyc

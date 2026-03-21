@@ -17,6 +17,7 @@ const store = useCatalogStore()
 const isPrint = computed(() => store.printMode)
 const fileInputRef = ref(null)
 const dragOver = ref(false)
+const replaceArmed = ref(false)
 
 async function readFile(file) {
   const dataUrl = await readImageFileAsDataURL(file)
@@ -32,13 +33,22 @@ function clearImage(e) {
 }
 
 function triggerSelect() {
+  // 已有图片时，不允许直接点击替换，避免误覆盖
+  if (props.hasImage && !replaceArmed.value) return
   fileInputRef.value?.click?.()
+}
+
+function armReplace(e) {
+  if (e && typeof e.stopPropagation === 'function') e.stopPropagation()
+  replaceArmed.value = true
+  triggerSelect()
 }
 
 async function onInputChange(event) {
   const file = event.target.files?.[0]
   await readFile(file)
   event.target.value = ''
+  replaceArmed.value = false
 }
 
 function onDragOver() {
@@ -51,8 +61,11 @@ function onDragLeave() {
 
 async function onDrop(event) {
   dragOver.value = false
+  // 已有图片时，不允许直接拖拽替换，避免误覆盖
+  if (props.hasImage && !replaceArmed.value) return
   const file = event.dataTransfer?.files?.[0]
   await readFile(file)
+  replaceArmed.value = false
 }
 </script>
 
@@ -76,6 +89,14 @@ async function onDrop(event) {
     <div class="overlay">
       <div class="icon">⬆</div>
       <div class="text">点击或拖拽上传</div>
+      <button
+        v-if="hasImage"
+        class="replace-btn"
+        type="button"
+        @click.stop="armReplace"
+      >
+        替换图片
+      </button>
       <button
         v-if="hasImage"
         class="clear-btn"
@@ -139,6 +160,16 @@ async function onDrop(event) {
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.6);
   background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+}
+
+.replace-btn {
+  margin-top: 6px;
+  padding: 2px 8px;
+  font-size: 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.18);
   color: #fff;
 }
 </style>

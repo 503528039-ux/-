@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
+import { DEFAULT_CELL_CN } from '../../utils/pageTextDefaults'
 import A4Page from '../layout/A4Page.vue'
 import EditableText from '../ui/EditableText.vue'
 import ImageUploader from '../ui/ImageUploader.vue'
@@ -14,9 +15,24 @@ const store = useCatalogStore()
 const pageData = computed(() => store.pages[props.pageIndex] || {})
 const displayTitle = computed(() => pageData.value.title || '权威认证与资质')
 const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Certificates & Honors')
-// 当前页仅显示前 6 个证书（2 列 × 3 行）；如需更多可新增一页资质页
-const certificatesList = computed(() => (pageData.value.items || []).slice(0, 6))
-const hasData = computed(() => certificatesList.value.length > 0)
+const MAX_CERTS = 6
+
+/**
+ * 固定格子布局：始终渲染 MAX_CERTS 个格子，删除时只清空内容不 splice，
+ * 从而保证“删除后剩余格子位置不变”。
+ */
+const certificatesList = computed(() => {
+  const items = Array.isArray(pageData.value.items) ? pageData.value.items : []
+  return Array.from({ length: MAX_CERTS }, (_, idx) => items[idx] || null)
+})
+
+const canAddCert = computed(() => {
+  const items = Array.isArray(pageData.value.items) ? pageData.value.items : []
+  const filled = Array.from({ length: MAX_CERTS }, (_, idx) => items[idx]).filter(
+    (c) => c && (c.image || c.name || c.text)
+  ).length
+  return filled < MAX_CERTS
+})
 
 /** 与 HTML PAGE 03 页眉一致 */
 const headerTitle = '2026 工程产品手册 / 荣誉与资质'
@@ -34,15 +50,16 @@ function updateSubtitle(val) {
 }
 function updateCertName(index, val) {
   const page = store.pages[props.pageIndex]
-  if (page?.items?.[index]) {
-    page.items[index].name = val
-    page.items[index].text = val
-  }
+  const cert = ensureCert(index)
+  if (!page || !cert) return
+  cert.name = val
+  cert.text = val
 }
 function updateCertImage(index, src) {
   const page = store.pages[props.pageIndex]
-  if (!page?.items?.[index]) return
-  page.items[index].image = src || ''
+  const cert = ensureCert(index)
+  if (!page || !cert) return
+  cert.image = src || ''
 }
 
 function ensureCert(index) {
@@ -54,6 +71,8 @@ function ensureCert(index) {
       id: `cert-${page.items.length}-${Date.now()}`,
       name: '',
       image: '',
+      // deleted=true：用户点击 × 删除后，该格不再显示上传/标题等可见内容
+      deleted: false,
       scale: 1,
       opacity: 1,
       rotation: 0,
@@ -62,6 +81,68 @@ function ensureCert(index) {
     })
   }
   return page.items[index]
+}
+
+function addCertCell() {
+  const page = store.pages[props.pageIndex]
+  if (!page) return
+  if (!Array.isArray(page.items)) page.items = []
+  // 优先恢复点 × 删除的格，再找首个无内容格（避免前面未使用空位抢走“新增”）
+  for (let idx = 0; idx < MAX_CERTS; idx++) {
+    const c = page.items[idx]
+    if (c?.deleted) {
+      const base = ensureCert(idx)
+      if (base) {
+        page.items[idx] = {
+          ...base,
+          name: '',
+          text: '',
+          image: '',
+          deleted: false,
+          scale: 1,
+          opacity: 1,
+          rotation: 0,
+          fit: 'contain',
+          position: '50% 50%'
+        }
+      }
+      return
+    }
+  }
+  for (let idx = 0; idx < MAX_CERTS; idx++) {
+    const c = page.items[idx]
+    const isEmpty = !c || !(c.image || c.name || c.text)
+    if (isEmpty) {
+      const target = ensureCert(idx)
+      if (target) target.deleted = false
+      return
+    }
+  }
+}
+
+function removeCertCell(index) {
+  const page = store.pages[props.pageIndex]
+  if (!page) return
+  if (!Array.isArray(page.items)) page.items = []
+  if (index < 0 || index >= MAX_CERTS) return
+
+  // 仅清空内容，不 splice，避免格子重排（位置保持不变）
+  const cert = ensureCert(index)
+  if (cert) {
+    const cleared = {
+      ...cert,
+      name: '',
+      text: '',
+      image: '',
+      deleted: true,
+      scale: 1,
+      opacity: 1,
+      rotation: 0,
+      fit: 'contain',
+      position: '50% 50%'
+    }
+    page.items[index] = cleared
+  }
 }
 
 function certImageStyle(cert) {
@@ -111,6 +192,7 @@ function cycleCertFit(index) {
 <template>
   <A4Page
     :custom-class="'certificates-page'"
+    :page-index="props.pageIndex"
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="store.pages.length"
@@ -120,29 +202,47 @@ function cycleCertFit(index) {
     <EditableText tag="h2" class-name="section-title" :value="displayTitle" @update:value="updateTitle" />
     <EditableText tag="div" class-name="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
 
+    <div
+      v-if="!store.printMode"
+      class="certs-add-row"
+      :class="{ 'certs-add-row--hidden': !canAddCert }"
+    >
+      <button type="button" class="certs-add-btn" @click.stop="addCertCell">新增一格</button>
+    </div>
+
     <!-- 2 列 × 4 行：单格更宽，证书图可用接近半页宽度展示 -->
-    <div v-if="hasData" class="certificates-grid">
+    <div class="certificates-grid">
       <div
         v-for="(cert, idx) in certificatesList"
-        :key="cert.id || idx"
+        :key="'cert-slot-' + idx"
         class="cert-cell"
+        :class="{ 'cert-cell--deleted': cert?.deleted }"
       >
         <div class="cert-cell__media">
+          <button
+            v-if="!store.printMode && !cert?.deleted"
+            type="button"
+            class="cell-remove-btn"
+            @click.stop="removeCertCell(idx)"
+          >
+            ×
+          </button>
           <img
-            v-if="cert.image"
-            :src="cert.image"
-            :alt="cert.text || cert.name"
+            v-if="cert?.image"
+            :src="cert?.image"
+            :alt="cert?.text || cert?.name"
             class="cert-cell__img"
             :style="certImageStyle(cert)"
           />
-          <div v-else class="cert-cell__placeholder">
+          <div v-else-if="!store.printMode && !cert?.deleted" class="cert-cell__placeholder">
             点击上传证书图
           </div>
           <ImageUploader
-            :has-image="!!cert.image"
+            v-if="!store.printMode && !cert?.deleted"
+            :has-image="!!cert?.image"
             @update:src="(src) => updateCertImage(idx, src)"
           />
-          <div class="img-tools">
+          <div v-if="!store.printMode && cert?.image" class="img-tools">
             <button type="button" @click.stop="updateCertScale(idx, 0.1)">＋</button>
             <button type="button" @click.stop="updateCertScale(idx, -0.1)">－</button>
             <button type="button" @click.stop="updateCertRotation(idx, -5)">↺</button>
@@ -152,47 +252,83 @@ function cycleCertFit(index) {
             <button type="button" @click.stop="cycleCertFit(idx)">适配</button>
           </div>
         </div>
-        <div class="cert-cell__caption">
+        <div
+          class="cert-cell__caption"
+          :class="{ 'cert-cell__caption--deleted': cert?.deleted }"
+        >
           <EditableText
             tag="div"
             class-name="cert-cell__title"
-            :value="cert.text || cert.name || ''"
+            :value="cert?.deleted ? '' : (cert?.text || cert?.name) || DEFAULT_CELL_CN"
             @update:value="(v) => updateCertName(idx, v)"
           />
         </div>
       </div>
     </div>
 
-    <div v-else class="empty-state">
-      <div class="empty-icon">🏆</div>
-      <p class="empty-text">暂无荣誉资质数据</p>
-      <p class="empty-hint">请在侧边栏添加证书项或从 Excel 导入</p>
-    </div>
-
-    <template #footer>
-      <div class="page-footer">- PAGE {{ String(props.pageIndex + 1).padStart(2, '0') }} -</div>
-    </template>
+    <!-- 使用 A4Page 默认页脚渲染（EditableText + renderedFooter） -->
   </A4Page>
 </template>
 
 <style scoped>
 /* 调整本页标题与网格的上下间距，减小红框留白 */
 :deep(.certificates-page .section-title) {
-  margin-bottom: 3mm;
+  margin-bottom: 0mm;
 }
 
 :deep(.certificates-page .section-subtitle) {
-  margin-bottom: 6mm;
+  margin-bottom: 2mm;
 }
 
-/* 每页 6 格：2 列 × 3 行（更高图片区，避免底部被页脚截断） */
+/* 每页 6 格：2 列 × 3 行；加大单元格吃满版心，上下保留过渡留白 */
 .certificates-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 8mm 10mm;
-  margin-top: 0;
+  grid-auto-rows: min-content;
+  gap: 6mm 6mm;
+  margin-top: 4mm;
+  margin-bottom: 6mm;
+}
+
+.certs-add-row {
+  display: flex;
+  justify-content: flex-end;
+  /* 与下方网格同属一块版心：负 margin-top 整体上移「新增一格」+ 证书格 */
+  margin-top: -15mm;
   margin-bottom: 2mm;
+}
+
+/* 不可新增时仍占位，避免 margin 变化带动网格上下跳动 */
+.certs-add-row--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.certs-add-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(94, 69, 133, 0.12);
+  color: var(--archie-purple, #5e4585);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cell-remove-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+  z-index: 30;
+  cursor: pointer;
 }
 
 .cert-cell {
@@ -203,18 +339,38 @@ function cycleCertFit(index) {
   background: #fff;
   overflow: hidden;
   min-height: 0;
+  height: 68mm;
+}
+
+.cert-cell--deleted {
+  /* 删除后：隐藏整格视觉（但格子占位仍保持，避免其它格子重排） */
+  border-color: transparent;
+  background: transparent;
+}
+
+.cert-cell--deleted .cert-cell__media {
+  background: transparent;
+}
+
+.cert-cell--deleted .cert-cell__placeholder,
+.cert-cell__caption--deleted {
+  visibility: hidden;
+}
+
+.cert-cell--deleted .cert-cell__placeholder {
+  display: none;
 }
 
 .cert-cell__media {
   position: relative;
-  /* 更高的图片区，适配 2×3 布局 */
+  /* 与单元格总高 68mm 配套：标题栏约 7–8mm */
   height: 60mm;
   min-height: 60mm;
   background: var(--color-image-bg, #f5f5f7);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3mm 4mm;
+  padding: 2.5mm 4mm;
   box-sizing: border-box;
 }
 
@@ -228,7 +384,7 @@ function cycleCertFit(index) {
 }
 
 .cert-cell__placeholder {
-  font-size: 11px;
+  font-size: 14.3px;
   color: #86868b;
   text-align: center;
   padding: 8px;
@@ -254,9 +410,11 @@ function cycleCertFit(index) {
 }
 
 .cert-cell__caption {
-  padding: 5px 8px 7px;
+  padding: 4px 8px 6px;
   border-top: 1px solid var(--divider, #e5e5ea);
   background: #fff;
+  overflow: hidden;
+  flex: 0 0 auto;
 }
 
 :deep(.cert-cell__title) {
@@ -264,7 +422,7 @@ function cycleCertFit(index) {
   color: var(--text-gray, #86868b);
   text-align: center;
   font-weight: 500;
-  line-height: 1.35;
+  line-height: 1.25;
 }
 
 .empty-state {
@@ -294,14 +452,34 @@ function cycleCertFit(index) {
   color: #86868b;
 }
 
+/* 强制继续向上压副标题（避免删除格子后上方空旷） */
+:deep(.cert-cell__title) {
+  font-size: 15px !important;
+  line-height: 1.15 !important;
+}
+
+.cert-cell__placeholder {
+  font-size: 16.5px !important;
+}
+
+:deep(.certificates-page .section-subtitle) {
+  margin-bottom: 0mm !important;
+}
+
 @media screen and (max-width: 768px) {
   .certificates-grid {
     grid-template-columns: 1fr;
     gap: 6mm;
+    margin-top: 3mm;
+    margin-bottom: 4mm;
+  }
+  .cert-cell {
+    height: auto;
+    min-height: 58mm;
   }
   .cert-cell__media {
-    height: 52mm;
-    min-height: 52mm;
+    height: 50mm;
+    min-height: 50mm;
   }
 }
 

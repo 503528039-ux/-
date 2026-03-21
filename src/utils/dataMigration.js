@@ -1,9 +1,11 @@
 /**
  * 数据版本管理与迁移工具
- * 
+ *
  * 该模块负责处理应用数据的版本迁移，确保旧版本数据能够安全地升级到最新版本。
  * 采用非破坏性迁移原则：优先新增字段，避免删除现有字段。
  */
+
+import { normalizeCatalogPages } from './pageTextDefaults'
 
 // 当前最新数据版本号
 export const LATEST_DATA_VERSION = 2
@@ -157,7 +159,10 @@ export function loadAndMigrateData() {
     if (!rawData) {
       return {
         version: LATEST_DATA_VERSION,
-        pages: []
+        pages: [],
+        headerTitleColor: '#1d1d1f',
+        headerTitleFontSizePx: 16,
+        headerTitleBlockColor: '#EDE9F5'
       }
     }
     
@@ -169,29 +174,45 @@ export function loadAndMigrateData() {
       console.error('解析 localStorage 数据失败:', parseError)
       return {
         version: LATEST_DATA_VERSION,
-        pages: []
+        pages: [],
+        headerTitleColor: '#1d1d1f',
+        headerTitleFontSizePx: 16,
+        headerTitleBlockColor: '#EDE9F5'
       }
     }
     
     // 执行迁移
     const migratedData = migrateData(data)
-    
-    // 如果数据发生了变化，保存回 localStorage
-    if (JSON.stringify(data) !== JSON.stringify(migratedData)) {
+    if (migratedData.headerTitleColor == null) migratedData.headerTitleColor = '#1d1d1f'
+    if (migratedData.headerTitleFontSizePx == null) migratedData.headerTitleFontSizePx = 16
+    if (migratedData.headerTitleBlockColor == null) migratedData.headerTitleBlockColor = '#EDE9F5'
+    const snapshotAfterMigrate = JSON.stringify(migratedData)
+
+    // 空标题等写回模板默认值（写入 JSON / localStorage）
+    if (migratedData.pages && Array.isArray(migratedData.pages)) {
+      normalizeCatalogPages(migratedData.pages)
+    }
+    const snapshotAfterNormalize = JSON.stringify(migratedData)
+
+    // 迁移有变化，或规范化补全了文案时，写回 localStorage
+    if (JSON.stringify(data) !== snapshotAfterMigrate || snapshotAfterMigrate !== snapshotAfterNormalize) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(migratedData))
-        console.log('已将迁移后的数据保存回 localStorage')
+        console.log('已将迁移/规范化后的数据保存回 localStorage')
       } catch (saveError) {
         console.warn('保存迁移后的数据失败:', saveError)
       }
     }
-    
+
     return migratedData
   } catch (error) {
     console.error('加载和迁移数据时发生未知错误:', error)
     return {
       version: LATEST_DATA_VERSION,
-      pages: []
+      pages: [],
+      headerTitleColor: '#1d1d1f',
+      headerTitleFontSizePx: 16,
+      headerTitleBlockColor: '#EDE9F5'
     }
   }
 }
@@ -199,17 +220,37 @@ export function loadAndMigrateData() {
 /**
  * 保存数据到 localStorage（自动添加版本号）
  * @param {Object} data - 要保存的数据（应包含 pages 字段）
+ * @returns {boolean} 是否写入成功（失败时可用于重试标记）
  */
 export function saveData(data) {
   try {
+    const pages = data.pages || []
+    normalizeCatalogPages(pages)
+    let existing = {}
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) existing = JSON.parse(raw)
+    } catch {
+      // ignore
+    }
     const dataToSave = {
       version: LATEST_DATA_VERSION,
-      pages: data.pages || []
+      pages,
+      headerTitleColor:
+        data.headerTitleColor ?? existing.headerTitleColor ?? '#1d1d1f',
+      headerTitleFontSizePx:
+        data.headerTitleFontSizePx ?? existing.headerTitleFontSizePx ?? 16,
+      headerTitleBlockColor:
+        data.headerTitleBlockColor ??
+        existing.headerTitleBlockColor ??
+        '#EDE9F5'
     }
-    
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave))
+    return true
   } catch (error) {
     console.error('保存数据失败:', error)
+    return false
   }
 }
 

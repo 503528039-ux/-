@@ -114,6 +114,54 @@ export class AddPageCommand extends BaseCommand<string> {
     
     // 根据页面类型创建默认块
     switch (this.pageType) {
+      case 'productGrid': {
+        // 6宫格实拍页（与现有 SFC 对齐）
+        const subType = this.pageSubType || 'lock'
+        const isLock = subType === 'lock'
+        const isSmartLock = subType === 'smartLock'
+        page.title = isSmartLock ? '智能门锁实拍' : isLock ? '门锁五金实拍' : '工程小五金实拍'
+        // A：页眉不带括号，智能门锁默认不设置 sub
+        page.sub = isSmartLock ? '' : isLock ? 'DOOR LOCK HARDWARE' : 'ENGINEERING HARDWARE'
+        page.items = Array(6).fill(null).map(() => ({
+          id: '',
+          name: isSmartLock ? '智能门锁' : isLock ? '产品名称' : '小五金配件',
+          model: isSmartLock ? 'AJ-SL-001' : isLock ? 'AJ-MODEL-001' : 'AJ-HW-001',
+          image: '',
+          specs: [
+            ...(isSmartLock ? [{ label: '功能', value: '指纹 / 密码 / NFC / 远程' }] : []),
+            { label: '材质', value: isLock || isSmartLock ? 'SUS304' : '优质合金' },
+            { label: '表面处理', value: isLock || isSmartLock ? '拉丝黑' : '电镀' },
+            { label: isLock || isSmartLock ? '可搭配锁体及规格' : '规格', value: '标准规格' },
+            { label: '适用范围', value: isSmartLock ? '智能门 / 公寓门' : isLock ? '工程门' : '工程配件' }
+          ]
+        }))
+        break
+      }
+      case 'compositeProduct': {
+        // 6宫格复合页（左产品、右线图）
+        const subType = this.pageSubType || 'lock'
+        const isLock = subType === 'lock'
+        const isSmartLock = subType === 'smartLock'
+        page.title = isSmartLock ? '智能门锁复合图解' : isLock ? '门锁五金复合图解' : '工程小五金复合图解'
+        // A：页眉不带括号，智能门锁默认不设置 sub
+        page.sub = isSmartLock ? '' : isLock ? 'DOOR LOCK COMPOSITE' : 'ENGINEERING HARDWARE COMPOSITE'
+        page.items = Array(6).fill(null).map(() => ({
+          id: '',
+          name: isSmartLock ? '智能门锁（复合）' : isLock ? '复合模式产品' : '复合配件',
+          model: isSmartLock ? 'AJ-SL-TECH-001' : isLock ? 'AJ-TECH-001' : 'AJ-HW-TECH-001',
+          image: '',
+          lineImage: '',
+          techTag: 'SCALE 1:1',
+          specs: [
+            ...(isSmartLock ? [{ label: '功能', value: '指纹 / 密码 / NFC / 远程' }] : []),
+            { label: '材质', value: 'SUS304' },
+            { label: '表面处理', value: isLock || isSmartLock ? '拉丝黑' : '电镀' },
+            { label: isLock || isSmartLock ? '可搭配锁体及规格' : '规格', value: '标准规格' },
+            { label: '适用范围', value: isSmartLock ? '智能门 / 公寓门' : isLock ? '工程门' : '工程配件' }
+          ]
+        }))
+        break
+      }
       case 'cover':
         // 封面页面 - 极简瑞士风格
         page.blocks = [

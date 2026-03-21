@@ -1,0 +1,7 @@
+PyMuPDF==1.26.3
+paddleocr==2.10.0
+# NOTE: paddlepaddle wheels are not available for Python 3.14+ yet on macOS.
+# Use Python 3.11 venv and let pip resolve a compatible paddlepaddle build.
+paddlepaddle
+opencv-python==4.12.0.88
+numpy==2.2.6

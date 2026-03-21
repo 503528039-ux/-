@@ -3,7 +3,15 @@
     <!-- 页眉 (可选) -->
     <header v-if="showHeader" class="page-header">
       <slot name="header">
-        <div class="header-title">{{ pageTitle || '2026 工程产品手册' }}</div>
+        <div class="header-title-block" :style="headerTitleBlockStyle">
+          <EditableText
+            tag="div"
+            class-name="header-title"
+            :style="headerTitleStyle"
+            :value="headerText"
+            @update:value="updateHeaderText"
+          />
+        </div>
       </slot>
     </header>
 
@@ -15,21 +23,87 @@
     <!-- 页脚 (可选) -->
     <footer v-if="showFooter" class="page-footer">
       <slot name="footer">
-        <div class="footer-text">- PAGE {{ String(pageNumber).padStart(2, '0') }} -</div>
+        <EditableText
+          tag="div"
+          class-name="footer-text"
+          :value="footerTemplate"
+          @update:value="updateFooterTemplate"
+        />
+        <div class="footer-rendered">{{ renderedFooter }}</div>
       </slot>
     </footer>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useCatalogStore } from '../../stores/index'
+import EditableText from '../ui/EditableText.vue'
+
+const props = defineProps({
   pageTitle: String,
   pageNumber: [Number, String],
   totalPages: [Number, String],
   showHeader: { type: Boolean, default: true },
   showFooter: { type: Boolean, default: true },
-  customClass: String
+  customClass: String,
+  pageIndex: { type: Number, default: -1 }
 })
+
+const store = useCatalogStore()
+
+const headerText = computed(() => {
+  const idx = props.pageIndex
+  const page = typeof idx === 'number' && idx >= 0 ? store.pages[idx] : null
+  return page?.props?.headerText || props.pageTitle || '2026 工程产品手册'
+})
+
+const footerTemplate = computed(() => {
+  const idx = props.pageIndex
+  const page = typeof idx === 'number' && idx >= 0 ? store.pages[idx] : null
+  return page?.props?.footerTemplate || '- PAGE {page} -'
+})
+
+const renderedFooter = computed(() => {
+  const page = String(props.pageNumber ?? '').padStart(2, '0')
+  return (footerTemplate.value || '').replace(/\{page\}/g, page)
+})
+
+/** 全页页眉：字号/颜色由侧栏「页眉」设置（catalog store） */
+const headerTitleStyle = computed(() => ({
+  color: store.headerTitleColor || '#1d1d1f',
+  fontSize: `${store.headerTitleFontSizePx ?? 16}px`
+}))
+
+/** 标题色块背景（侧栏「色块背景」） */
+const headerTitleBlockStyle = computed(() => ({
+  backgroundColor: store.headerTitleBlockColor || '#EDE9F5'
+}))
+
+function ensurePageProps() {
+  const idx = props.pageIndex
+  if (typeof idx !== 'number' || idx < 0) return null
+  const page = store.pages[idx]
+  if (!page) return null
+  if (!page.props || typeof page.props !== 'object') page.props = {}
+  return page
+}
+
+function updateHeaderText(val) {
+  const page = ensurePageProps()
+  if (!page) return
+  store.recordSnapshot?.()
+  page.props.headerText = val
+}
+
+function updateFooterTemplate(val) {
+  // 全局：同步所有页面的 footerTemplate
+  store.recordSnapshot?.()
+  store.pages.forEach((p) => {
+    if (!p.props || typeof p.props !== 'object') p.props = {}
+    p.props.footerTemplate = val
+  })
+}
 </script>
 
 <style scoped>
@@ -64,7 +138,6 @@ defineProps({
   position: relative;
   display: flex;
   flex-direction: column;
-
   /* 页面阴影效果 */
   box-shadow: var(--shadow-page, 0 20px 50px rgba(0, 0, 0, 0.15));
 
@@ -80,7 +153,10 @@ defineProps({
   display: flex;
   flex-direction: column;
   position: relative;
+  /* 保持裁切，避免内容重排后覆盖页脚 */
   overflow: hidden;
+  /* 关键：允许 page-content 在 flex 布局中正确收缩，避免溢出时把页脚文字裁切 */
+  min-height: 0;
 }
 
 /* ===== 打印样式适配 ===== */
@@ -115,5 +191,31 @@ defineProps({
   .page-content {
     overflow: visible;
   }
+}
+
+.footer-rendered {
+  display: none;
+}
+
+@media print {
+  .footer-text {
+    display: none;
+  }
+  .footer-rendered {
+    display: block;
+  }
+}
+
+/* 横向页眉：右侧色块包字（阴影见 main.css .header-title-block） */
+.header-title-block {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 100%;
+  margin-top: 3mm;
+  padding: 0.5em 1em;
+  border-radius: 8px;
+  box-sizing: border-box;
+  transform: translate(2px, 0);
 }
 </style>

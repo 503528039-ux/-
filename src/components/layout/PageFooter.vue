@@ -118,6 +118,10 @@ const footerStyle = computed(() => ({
   justify-content: center;
   align-items: center;
 
+  /* 确保页脚文本在内容溢出/重排时不被覆盖 */
+  position: relative;
+  z-index: 50;
+
   /* 字体：9px */
   font-size: 9px;
 

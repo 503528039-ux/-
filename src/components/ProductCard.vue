@@ -8,9 +8,11 @@
  * - lineImage 存在 → composite-mode（实拍图58% + 线图38%）
  * - lineImage 不存在 → standard-mode（单张实拍图）
  */
-import { computed } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useCatalogStore } from '../stores/index'
+import { DEFAULT_CELL_CN } from '../utils/pageTextDefaults'
 import ImageUploader from './ui/ImageUploader.vue'
+import EditableText from './ui/EditableText.vue'
 import type { Product, SpecItem } from '../data/catalog'
 
 const store = useCatalogStore()
@@ -19,12 +21,16 @@ const store = useCatalogStore()
 const props = defineProps<{
   /** 产品数据对象（来自 catalog.ts） */
   data: Product
+  /** 强制复合模式：用于复合图解页，确保每个宫格都有「线图 + 产品图」两个容器 */
+  forceComposite?: boolean
   /** 是否为只读模式（打印时自动启用） */
   readonly?: boolean
   /** 图册页索引，与 productIndex 同时传入时可在卡片内上传/拖拽换图 */
   pageIndex?: number
   /** 当前页 items 中的产品下标 */
   productIndex?: number
+  /** 点击 × 时由父页移除该槽（占位不 splice） */
+  requestRemove?: () => void
 }>()
 
 // ===== Emits 定义 =====
@@ -34,9 +40,11 @@ const emit = defineEmits<{
 
 // ===== 计算属性 =====
 
-/** 智能模式判断：lineImage 存在则为复合模式 */
+const isDeleted = computed(() => !!(props.data as Record<string, unknown>)?.deleted)
+
+/** 模式判断：复合图解页强制复合；否则按 lineImage 是否存在智能切换 */
 const isCompositeMode = computed(() => {
-  return !!props.data.lineImage
+  return !!props.forceComposite || !!props.data.lineImage
 })
 
 /** 是否有实拍图 */
@@ -56,11 +64,21 @@ const techTag = computed(() => {
 
 /** 规格参数列表 */
 const specsList = computed<SpecItem[]>(() => {
-  return props.data.specs || []
+  const list = props.data.specs || []
+  const pi = props.pageIndex
+  const page = typeof pi === 'number' ? (store.pages[pi] as any) : null
+  const isLockPage = page?.subType === 'lock'
+  if (!isLockPage) return list
+  return list.map((s) => {
+    if (!s || typeof s !== 'object') return s
+    if (s.label === '规格') return { ...s, label: '可搭配锁体及规格' }
+    return s
+  })
 })
 
 const canEditImages = computed(() => {
   if (props.readonly) return false
+  if (isDeleted.value) return false
   const pi = props.pageIndex
   const idx = props.productIndex
   return (
@@ -70,6 +88,62 @@ const canEditImages = computed(() => {
     idx >= 0 &&
     !store.printMode
   )
+})
+
+const showRemoveBtn = computed(() => {
+  if (isDeleted.value || store.printMode) return false
+  return typeof props.requestRemove === 'function'
+})
+
+// ===== 点击才进入：名称/型号可编辑态（仅对当前卡片）=====
+const cardRootRef = ref<HTMLElement | null>(null)
+const isMetaEditing = ref(false)
+
+function setProductMetaField(field: 'name' | 'model', value: string | null) {
+  const pi = props.pageIndex
+  const idx = props.productIndex
+  if (typeof pi !== 'number' || typeof idx !== 'number') return
+  const page = store.pages[pi] as { items?: Product[] } | undefined
+  if (page?.items?.[idx]) {
+    ;(page.items[idx] as Record<string, string>)[field] = value ?? ''
+  }
+}
+
+function setProductSpecValue(specIndex: number, value: string | null) {
+  const pi = props.pageIndex
+  const idx = props.productIndex
+  if (typeof pi !== 'number' || typeof idx !== 'number') return
+  const page = store.pages[pi] as { items?: Product[] } | undefined
+  const item = page?.items?.[idx] as Product | undefined
+  if (!item?.specs || !item.specs[specIndex]) return
+  item.specs[specIndex].value = value ?? ''
+}
+
+function disableMetaEditing() {
+  isMetaEditing.value = false
+}
+
+const onDocPointerDown = (e: PointerEvent) => {
+  if (!isMetaEditing.value) return
+  const el = cardRootRef.value
+  if (!el) return
+  const t = e.target as Node | null
+  if (t && !el.contains(t)) {
+    // 让 EditableText 先完成 blur/commit，再卸载编辑态
+    setTimeout(disableMetaEditing, 0)
+  }
+}
+
+watch(isMetaEditing, (val) => {
+  if (val) {
+    document.addEventListener('pointerdown', onDocPointerDown, true)
+  } else {
+    document.removeEventListener('pointerdown', onDocPointerDown, true)
+  }
+})
+
+onUnmounted(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown, true)
 })
 
 function setProductField(field: 'image' | 'lineImage', src: string | null) {
@@ -187,15 +261,34 @@ function imageStyle(img: { scale?: number; opacity?: number; rotation?: number; 
 
 // ===== 方法 =====
 function handleClick() {
+  if (isDeleted.value) return
+  // 仅允许非打印态进入编辑态；图片编辑工具条逻辑保持原样。
+  if (!store.printMode) isMetaEditing.value = true
   emit('click', props.data)
+}
+
+function onRemoveClick() {
+  props.requestRemove?.()
 }
 </script>
 
 <template>
   <div
     class="product-card"
+    :class="{ 'product-card--deleted': isDeleted }"
+    ref="cardRootRef"
     @click="handleClick"
   >
+    <button
+      v-if="showRemoveBtn"
+      type="button"
+      class="cell-remove-btn"
+      aria-label="删除此格"
+      @click.stop="onRemoveClick"
+    >
+      ×
+    </button>
+    <div class="card-inner" :class="{ 'card-inner--deleted': isDeleted }">
     <!-- ===== 标准模式：单张实拍图 ===== -->
     <div
       v-if="!isCompositeMode"
@@ -206,7 +299,7 @@ function handleClick() {
         :src="data.image"
         :alt="data.name"
         class="product-img"
-        :style="imageStyle(getImageTransform('image', 'contain'), 'contain')"
+        :style="imageStyle(getImageTransform('image', 'cover'), 'cover')"
       >
       <div v-else class="image-placeholder">
         <span class="placeholder-text">{{ data.model }}</span>
@@ -232,60 +325,63 @@ function handleClick() {
       v-else
       class="card-img-box composite-mode"
     >
-      <!-- 左侧：实拍图区域 (58%) -->
+      <!-- 左侧：产品图区域 (58%) -->
       <div class="composite-photo">
-        <img
-          v-if="hasImage"
-          :src="data.image"
-          :alt="data.name"
-          :style="imageStyle(getImageTransform('image', 'contain'), 'contain')"
-        >
-        <div v-else class="image-placeholder mini">
-          <span class="placeholder-text">实拍图</span>
-        </div>
-        <ImageUploader
-          v-if="canEditImages"
-          :has-image="hasImage"
-          @update:src="(src) => setProductField('image', src)"
-        />
-        <div v-if="canEditImages && hasImage" class="img-tools">
-          <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
-          <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
-          <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
-          <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
-          <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
-          <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
-          <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
+        <div class="composite-photo-box">
+          <img
+            v-if="hasImage"
+            :src="data.image"
+            :alt="data.name"
+            :style="imageStyle(getImageTransform('image', 'cover'), 'cover')"
+          >
+          <div v-else class="image-placeholder mini">
+            <span class="placeholder-text">产品图</span>
+          </div>
+          <ImageUploader
+            v-if="canEditImages"
+            :has-image="hasImage"
+            @update:src="(src) => setProductField('image', src)"
+          />
+          <div v-if="canEditImages && hasImage" class="img-tools">
+            <button type="button" @click.stop="updateImageScale('image', 0.1, 'contain')">＋</button>
+            <button type="button" @click.stop="updateImageScale('image', -0.1, 'contain')">－</button>
+            <button type="button" @click.stop="updateImageRotation('image', -5, 'contain')">↺</button>
+            <button type="button" @click.stop="updateImageRotation('image', 5, 'contain')">↻</button>
+            <button type="button" @click.stop="updateImageOpacity('image', -0.1, 'contain')">淡</button>
+            <button type="button" @click.stop="updateImageOpacity('image', 0.1, 'contain')">浓</button>
+            <button type="button" @click.stop="cycleFit('imageFit')">适配</button>
+          </div>
         </div>
       </div>
 
       <!-- 右侧：线图区域 (38%) -->
       <div class="composite-line">
-        <!-- 技术标签 -->
-        <div class="tech-tag">{{ techTag }}</div>
+        <div class="composite-line-box">
+          <div class="tech-tag">{{ techTag }}</div>
 
-        <img
-          v-if="hasLineImage"
-          :src="data.lineImage"
-          :alt="`${data.name} 线图`"
-          :style="imageStyle(getImageTransform('line', 'contain'), 'contain')"
-        >
-        <div v-else class="image-placeholder mini">
-          <span class="placeholder-text">线图</span>
-        </div>
-        <ImageUploader
-          v-if="canEditImages"
-          :has-image="hasLineImage"
-          @update:src="(src) => setProductField('lineImage', src)"
-        />
-        <div v-if="canEditImages && hasLineImage" class="img-tools">
-          <button type="button" @click.stop="updateImageScale('line', 0.1, 'contain')">＋</button>
-          <button type="button" @click.stop="updateImageScale('line', -0.1, 'contain')">－</button>
-          <button type="button" @click.stop="updateImageRotation('line', -5, 'contain')">↺</button>
-          <button type="button" @click.stop="updateImageRotation('line', 5, 'contain')">↻</button>
-          <button type="button" @click.stop="updateImageOpacity('line', -0.1, 'contain')">淡</button>
-          <button type="button" @click.stop="updateImageOpacity('line', 0.1, 'contain')">浓</button>
-          <button type="button" @click.stop="cycleFit('lineFit')">适配</button>
+          <img
+            v-if="hasLineImage"
+            :src="data.lineImage"
+            :alt="`${data.name} 线图`"
+            :style="imageStyle(getImageTransform('line', 'cover'), 'cover')"
+          >
+          <div v-else class="image-placeholder mini">
+            <span class="placeholder-text">线图</span>
+          </div>
+          <ImageUploader
+            v-if="canEditImages"
+            :has-image="hasLineImage"
+            @update:src="(src) => setProductField('lineImage', src)"
+          />
+          <div v-if="canEditImages && hasLineImage" class="img-tools">
+            <button type="button" @click.stop="updateImageScale('line', 0.1, 'contain')">＋</button>
+            <button type="button" @click.stop="updateImageScale('line', -0.1, 'contain')">－</button>
+            <button type="button" @click.stop="updateImageRotation('line', -5, 'contain')">↺</button>
+            <button type="button" @click.stop="updateImageRotation('line', 5, 'contain')">↻</button>
+            <button type="button" @click.stop="updateImageOpacity('line', -0.1, 'contain')">淡</button>
+            <button type="button" @click.stop="updateImageOpacity('line', 0.1, 'contain')">浓</button>
+            <button type="button" @click.stop="cycleFit('lineFit')">适配</button>
+          </div>
         </div>
       </div>
     </div>
@@ -293,8 +389,23 @@ function handleClick() {
     <!-- ===== 产品信息区域 ===== -->
     <div class="card-info">
       <!-- 标题行 -->
-      <div class="card-title">{{ data.name }}</div>
-      <div class="card-model">{{ data.model }}</div>
+      <div v-if="!isMetaEditing" class="card-title">{{ data.name || DEFAULT_CELL_CN }}</div>
+      <EditableText
+        v-else
+        tag="div"
+        class-name="card-title"
+        :value="data.name || DEFAULT_CELL_CN"
+        @update:value="(v) => setProductMetaField('name', v)"
+      />
+
+      <div v-if="!isMetaEditing" class="card-model">{{ data.model || DEFAULT_CELL_CN }}</div>
+      <EditableText
+        v-else
+        tag="div"
+        class-name="card-model"
+        :value="data.model || DEFAULT_CELL_CN"
+        @update:value="(v) => setProductMetaField('model', v)"
+      />
 
       <!-- 规格参数列表 -->
       <div class="card-specs-mini">
@@ -305,9 +416,17 @@ function handleClick() {
           :class="{ 'full-width': spec.fullWidth }"
         >
           <span class="mini-label">{{ spec.label }}</span>
-          <span class="mini-value">{{ spec.value }}</span>
+          <EditableText
+            v-if="isMetaEditing"
+            tag="span"
+            class-name="mini-value"
+            :value="spec.value || DEFAULT_CELL_CN"
+            @update:value="(v) => setProductSpecValue(index, v)"
+          />
+          <span v-else class="mini-value">{{ spec.value || DEFAULT_CELL_CN }}</span>
         </div>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -329,11 +448,45 @@ function handleClick() {
   display: flex;
   flex-direction: column;
   cursor: pointer;
+  position: relative;
+}
+
+.product-card--deleted {
+  cursor: default;
+}
+
+.card-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.card-inner--deleted {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cell-remove-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+  z-index: 30;
+  cursor: pointer;
 }
 
 /* ===== 图片区域基础样式 ===== */
 .card-img-box {
-  height: 48mm;
+  /* 收紧高度，避免第三行被页脚裁切 */
+  height: 42mm;
   border-radius: 12px;
   display: flex;
   justify-content: center;
@@ -362,35 +515,31 @@ function handleClick() {
 
 /* ===== 标准模式样式 ===== */
 .card-img-box.standard-mode {
-  /* 浅灰色背景 */
-  background-color: var(--color-image-bg, #f5f5f7);
-  padding: 10mm;
+  /* 去掉底色：保持透明 */
+  background-color: transparent;
+  padding: 0;
 }
 
 /* 产品图片 - 标准模式 */
 .product-img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   /* 混合模式：与背景融合 */
   mix-blend-mode: multiply;
 }
 
 /* ===== 复合模式样式 ===== */
 .card-img-box.composite-mode {
-  /* 白色背景 */
-  background-color: #ffffff;
-  /* 金色边框 */
-  border: 0.5px solid rgba(154, 128, 94, 0.3);
+  /* 去掉底色/边框/网格：保持透明 */
+  background-color: transparent;
+  border: none;
   border-radius: 6px;
-  /* 网格背景 - linear-gradient */
-  background-image:
-    linear-gradient(rgba(154, 128, 94, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(154, 128, 94, 0.05) 1px, transparent 1px);
-  background-size: 5mm 5mm;
+  background-image: none;
   /* 左右分布 */
   justify-content: space-between;
-  padding: 5mm 3mm;
+  padding: 0;
 }
 
 /* 实拍图区域 (58%) */
@@ -404,9 +553,23 @@ function handleClick() {
   z-index: 2;
 }
 
+.composite-photo-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 6px;
+  background: transparent;
+  overflow: hidden;
+}
+
 .composite-photo img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   /* 投影效果 */
   filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.08));
   mix-blend-mode: multiply;
@@ -419,15 +582,29 @@ function handleClick() {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 左侧虚线边框 */
+  /* 左侧虚线边框（分隔线） */
   border-left: 1px dashed rgba(154, 128, 94, 0.4);
   position: relative;
   padding-left: 3mm;
 }
 
+.composite-line-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-radius: 6px;
+  background: transparent;
+  overflow: hidden;
+}
+
 .composite-line img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
   /* 线图滤镜效果：高对比度、灰度、降低亮度 */
   filter: contrast(200%) grayscale(100%) brightness(0.85);
   mix-blend-mode: multiply;
@@ -437,14 +614,16 @@ function handleClick() {
 /* 技术标签 - 仅复合模式 */
 .tech-tag {
   position: absolute;
-  top: -6px;
-  right: 0;
+  /* 避免跑出容器圆角导致右上角露白块 */
+  top: 4px;
+  right: 4px;
   font-size: 7px;
   color: var(--color-text-gray, #86868B);
   font-family: var(--font-mono, 'Inter', monospace);
-  background: #ffffff;
-  padding: 0 4px;
+  background: transparent;
+  padding: 0;
   letter-spacing: 0.5px;
+  pointer-events: none;
 }
 
 /* ===== 图片占位符 ===== */
@@ -470,7 +649,7 @@ function handleClick() {
 
 /* ===== 产品信息区域 ===== */
 .card-info {
-  padding-top: 12px;
+  padding-top: 6px;
   flex-grow: 1;
   display: flex;
   flex-direction: column;
@@ -478,7 +657,7 @@ function handleClick() {
 
 /* 产品标题 */
 .card-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-text-dark, #1D1D1F);
   margin-bottom: 2px;
@@ -491,24 +670,41 @@ function handleClick() {
   font-family: var(--font-sans, 'Inter', sans-serif);
   color: var(--color-archie-purple, #5E4585);
   font-weight: 600;
-  margin-bottom: 10px;
+  margin-bottom: 3px;
 }
 
 /* ===== 规格参数列表 ===== */
 .card-specs-mini {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
-/* 规格行 - 虚线边框分隔 */
+/* 规格行 - 使用左侧小圆点替代底部分隔线 */
 .mini-spec-row {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  /* 虚线底部边框 */
-  border-bottom: 0.5px dashed var(--color-divider, #E5E5EA);
-  padding-bottom: 3px;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 9px;
+  line-height: 1.35;
+  position: relative;
+  border-bottom: none;
+  padding: 4px 6px 4px 14px;
+  border-radius: 6px;
+  /* 极浅底色，增强条目感但不抢眼 */
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.mini-spec-row::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 0.65em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.16);
 }
 
 /* 全宽规格行 */
@@ -518,15 +714,25 @@ function handleClick() {
 
 /* 规格标签 */
 .mini-label {
+  flex-shrink: 0;
   color: var(--color-text-gray, #86868B);
   font-family: var(--font-sans, 'Inter', sans-serif);
+  line-height: 1.35;
 }
 
 /* 规格值 */
 .mini-value {
+  min-width: 0;
+  text-align: right;
   color: var(--color-text-dark, #1D1D1F);
   font-weight: 500;
   font-family: var(--font-sans, 'Inter', sans-serif);
+  line-height: 1.35;
+}
+
+.mini-value :deep(.editable-core) {
+  line-height: 1.35;
+  vertical-align: top;
 }
 
 /* ===== 打印适配 ===== */

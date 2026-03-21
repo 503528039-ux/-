@@ -1,4 +1,12 @@
-# archie-catalog
+# archie-catalog（雅洁五金 2026 工程图册）
+
+基于 Vue 3 + Vite 的 A4 工程产品图册编辑器，支持多页模板、产品网格、页眉页脚与数据持久化。
+
+- **近期项目报告与进度分析**：[docs/PROJECT_REPORT_20260321.md](docs/PROJECT_REPORT_20260321.md)
+
+---
+
+以下为 Vite 模板默认说明（可保留作开发参考）。
 
 This template should help get you started developing with Vue 3 in Vite.
 

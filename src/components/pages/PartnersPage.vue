@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
+import { DEFAULT_CELL_CN } from '../../utils/pageTextDefaults'
 import A4Page from '../layout/A4Page.vue'
 import ImageUploader from '../ui/ImageUploader.vue'
 import EditableText from '../ui/EditableText.vue'
@@ -17,8 +18,36 @@ const store = useCatalogStore()
 const pageData = computed(() => store.pages[props.pageIndex] || {})
 const displayTitle = computed(() => pageData.value.title || '战略合作伙伴')
 const displaySubtitle = computed(() => pageData.value.sub || pageData.value.subtitle || 'Global Partners')
-const partnersList = computed(() => pageData.value.items || [])
-const hasData = computed(() => partnersList.value.length > 0)
+// 设计为 3×5 网格
+const MAX_PARTNERS = 15
+const isPartnerFilled = (p) =>
+  !!(p && !p.deleted && (p.image || (typeof p.name === 'string' && p.name.trim())))
+
+const partnersList = computed(() => {
+  const page = pageData.value
+  if (!page) return []
+  if (!Array.isArray(page.items)) page.items = []
+  // 固定渲染数量，删除/新增不应改变格子位置
+  while (page.items.length < MAX_PARTNERS) {
+    const idx = page.items.length
+    page.items.push({
+      id: `partner-${idx}-${Date.now()}`,
+      name: '',
+      image: '',
+      deleted: false,
+      scale: 1,
+      opacity: 1,
+      rotation: 0,
+      fit: 'contain',
+      position: '50% 50%'
+    })
+  }
+  return page.items.slice(0, MAX_PARTNERS)
+})
+
+const filledPartnerCount = computed(() => partnersList.value.filter(isPartnerFilled).length)
+const hasData = computed(() => filledPartnerCount.value > 0)
+const canAddPartner = computed(() => filledPartnerCount.value < MAX_PARTNERS)
 const totalPages = computed(() => store.pages.length)
 
 /** 与 HTML PAGE 04 一致 */
@@ -55,6 +84,60 @@ function ensurePartner(index) {
   if (p.fit == null) p.fit = 'contain'
   if (p.position == null) p.position = '50% 50%'
   return p
+}
+
+function addPartnerCell() {
+  const page = store.pages[props.pageIndex]
+  if (!page) return
+  if (store.printMode) return
+  if (!Array.isArray(page.items)) page.items = []
+  const resetPartner = (p, idx) => ({
+    ...p,
+    id: p?.id || `partner-${idx}-${Date.now()}`,
+    name: '',
+    image: '',
+    deleted: false,
+    scale: 1,
+    opacity: 1,
+    rotation: 0,
+    fit: 'contain',
+    position: '50% 50%'
+  })
+  for (let idx = 0; idx < MAX_PARTNERS; idx++) {
+    const p = page.items[idx]
+    if (p?.deleted) {
+      page.items[idx] = resetPartner(p, idx)
+      return
+    }
+  }
+  for (let idx = 0; idx < MAX_PARTNERS; idx++) {
+    const p = page.items[idx]
+    if (!isPartnerFilled(p)) {
+      if (!p) continue
+      page.items[idx] = resetPartner(p, idx)
+      return
+    }
+  }
+}
+
+function removePartnerCell(index) {
+  const page = store.pages[props.pageIndex]
+  if (!page?.items || !Array.isArray(page.items)) return
+  if (index < 0 || index >= MAX_PARTNERS) return
+
+  const p = page.items[index]
+  if (!p) return
+  page.items[index] = {
+    ...p,
+    name: '',
+    image: '',
+    deleted: true,
+    scale: 1,
+    opacity: 1,
+    rotation: 0,
+    fit: 'contain',
+    position: '50% 50%'
+  }
 }
 
 function updatePartnerScale(index, delta) {
@@ -105,33 +188,60 @@ function updatePartnerName(index, val) {
 
 <template>
   <A4Page
+    :page-index="props.pageIndex"
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
     :show-header="true"
     :show-footer="true"
   >
-    <EditableText tag="h2" class-name="section-title" :value="displayTitle" @update:value="updateTitle" />
-    <EditableText tag="div" class-name="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
+    <div class="partners-page-head">
+      <div class="partners-titles">
+        <EditableText tag="h2" class-name="section-title" :value="displayTitle" @update:value="updateTitle" />
+        <EditableText tag="div" class-name="section-subtitle" :value="displaySubtitle" @update:value="updateSubtitle" />
+      </div>
+      <button
+        v-if="!store.printMode && canAddPartner"
+        type="button"
+        class="partners-add-btn"
+        @click.stop="addPartnerCell"
+      >
+        新增一格
+      </button>
+    </div>
 
-    <div v-if="hasData" class="grid-partner">
+    <div v-if="!store.printMode || hasData" class="grid-partner">
       <div
         v-for="(partner, idx) in partnersList"
-        :key="partner.id || idx"
+        :key="'partner-slot-' + idx"
         class="partner-box"
+        :class="{ 'partner-box--deleted': partner?.deleted }"
       >
-        <div v-if="partner.image" class="partner-logo-wrap">
+        <div class="partner-media">
+          <button
+            v-if="!store.printMode && !partner?.deleted"
+            type="button"
+            class="cell-remove-btn"
+            @click.stop="removePartnerCell(idx)"
+          >
+            ×
+          </button>
           <img
+            v-if="partner.image && !partner?.deleted"
             :src="partner.image"
             alt=""
-            class="partner-logo-img"
+            class="partner-img"
             :style="partnerImageStyle(partner)"
           />
+          <div v-else-if="!store.printMode && !partner?.deleted" class="partner-placeholder">上传 Logo</div>
+
           <ImageUploader
-            :has-image="true"
+            v-if="!store.printMode && !partner?.deleted"
+            :has-image="!!partner.image"
             @update:src="(src) => updatePartnerImage(idx, src)"
           />
-          <div class="img-tools">
+
+          <div v-if="!store.printMode && partner.image && !partner?.deleted" class="img-tools">
             <button type="button" @click.stop="updatePartnerScale(idx, 0.1)">＋</button>
             <button type="button" @click.stop="updatePartnerScale(idx, -0.1)">－</button>
             <button type="button" @click.stop="updatePartnerRotation(idx, -5)">↺</button>
@@ -141,16 +251,15 @@ function updatePartnerName(index, val) {
             <button type="button" @click.stop="cyclePartnerFit(idx)">适配</button>
           </div>
         </div>
-        <div v-else class="partner-upload-slot">
-          <ImageUploader
-            :has-image="false"
-            @update:src="(src) => updatePartnerImage(idx, src)"
-          />
-        </div>
+
         <EditableText
+          v-if="
+            !partner?.deleted &&
+            (!store.printMode || (store.printMode && partner.name && String(partner.name).trim()))
+          "
           tag="div"
           class-name="partner-name-text"
-          :value="partner.name || ''"
+          :value="partner.name || DEFAULT_CELL_CN"
           @update:value="(v) => updatePartnerName(idx, v)"
         />
       </div>
@@ -211,17 +320,6 @@ function updatePartnerName(index, val) {
   cursor: pointer;
 }
 
-:deep(.partner-name-text) {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-gray, #86868b);
-  text-align: center;
-  padding: 0 6px;
-  line-height: 1.25;
-  max-width: 100%;
-  word-break: break-all;
-}
-
 .empty-state {
   display: flex;
   flex-direction: column;
@@ -249,6 +347,48 @@ function updatePartnerName(index, val) {
   color: #86868b;
 }
 
+/* 标题与「新增一格」同一行，避免单独一行 + 大段空白 */
+.partners-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.partners-titles {
+  flex: 1 1 auto;
+  min-width: min(100%, 12rem);
+}
+
+.partners-add-btn {
+  flex: 0 0 auto;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(94, 69, 133, 0.12);
+  color: var(--archie-purple, #5e4585);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cell-remove-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 12px;
+  line-height: 16px;
+  z-index: 30;
+  cursor: pointer;
+}
+
 @media print {
   .empty-state {
     display: none;
@@ -256,5 +396,102 @@ function updatePartnerName(index, val) {
   .partner-upload-slot {
     display: none;
   }
+}
+
+/* ===== v2026-03：伙伴页紧凑 + 每项全尺寸图片容器 ===== */
+:deep(.partners-page-head .section-subtitle) {
+  margin-bottom: 0;
+}
+
+/* 版心内放大单元格：略增高、缩间距，减少两侧与上方的“空位”感 */
+:deep(.grid-partner) {
+  margin-top: 8mm;
+  gap: 5mm;
+}
+
+:deep(.partner-box) {
+  height: 40mm;
+  min-height: 40mm;
+}
+
+.partner-media {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: transparent;
+}
+
+.partner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  max-width: none;
+  max-height: none;
+}
+
+.partner-placeholder {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(134, 134, 139, 0.7);
+  letter-spacing: 0.8px;
+}
+
+/* 名称在 Logo 下方独立一行，避免绝对定位 + 空 contenteditable 高度塌陷成细线 */
+:deep(.partner-name-text) {
+  flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 24px;
+  padding: 4px 6px 5px;
+  font-size: 9px;
+  font-weight: 600;
+  color: rgba(134, 134, 139, 0.92);
+  text-align: center;
+  line-height: 1.25;
+  word-break: break-all;
+}
+
+:deep(.partner-name-text .editable-core) {
+  display: block;
+  width: 100%;
+  min-height: 18px;
+  box-sizing: border-box;
+  padding: 3px 5px;
+  border-radius: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.65);
+}
+
+@media print {
+  :deep(.partner-name-text .editable-core) {
+    border: none;
+    padding: 0;
+    background: transparent;
+    min-height: 0;
+  }
+}
+
+@media print {
+  .img-tools {
+    display: none;
+  }
+}
+
+.partner-box--deleted {
+  background: transparent !important;
+  box-shadow: none;
+}
+
+.partner-box--deleted .partner-media {
+  background: transparent;
+}
+
+.partner-box--deleted .partner-placeholder {
+  display: none;
 }
 </style>

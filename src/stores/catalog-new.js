@@ -1,4 +1,4 @@
-import { ref, watch, computed, nextTick } from 'vue'
+import { ref, watch, computed, nextTick, onScopeDispose } from 'vue'
 import { defineStore } from 'pinia'
 import * as XLSX from 'xlsx'
 import { nanoid } from 'nanoid'
@@ -19,10 +19,19 @@ import {
 } from '../commands'
 
 // 导入数据迁移工具
-import { loadAndMigrateData, saveData } from '../utils/dataMigration'
+import { loadAndMigrateData, saveData, LATEST_DATA_VERSION } from '../utils/dataMigration'
+import { normalizeCatalogPages } from '../utils/pageTextDefaults'
 
 // 导入页面模板工具
 import { getInitialPageData } from '../config/pageTemplates'
+import { MAX_PRODUCT_GRID } from '../utils/productGridItems'
+import {
+  parseSheetToProductRows,
+  parseCategoryFromExcelRow,
+  buildProductGridItemFromRow,
+  getProductGridPageMeta,
+  padChunkToSix
+} from '../utils/excelProductImport'
 
 // 环境变量，控制是否使用命令模式
 const USE_COMMANDS = true
@@ -32,32 +41,68 @@ const USE_COMMANDS = true
  */
 export const useCatalogStore = defineStore('catalog', () => {
   /**
-   * 从 localStorage 安全地加载并迁移页面数据
-   * @returns {Array} 页面数据数组，如果加载失败或没有数据则返回空数组
+   * 从 localStorage 加载图册与页眉外观设置
    */
-  const _loadPagesFromStorage = () => {
+  const _loadCatalogFromStorage = () => {
     try {
-      // 使用数据迁移工具加载和迁移数据
       const migratedData = loadAndMigrateData()
-      
-      // 确保返回的是页面数组
-      if (migratedData && Array.isArray(migratedData.pages)) {
-        console.log(`数据加载完成：版本 ${migratedData.version}，共 ${migratedData.pages.length} 个页面`)
-        return migratedData.pages
+      const list = Array.isArray(migratedData.pages) ? migratedData.pages : []
+      console.log(`数据加载完成：版本 ${migratedData.version}，共 ${list.length} 个页面`)
+      return {
+        pages: list,
+        headerTitleColor: migratedData.headerTitleColor ?? '#1d1d1f',
+        headerTitleFontSizePx: migratedData.headerTitleFontSizePx ?? 16,
+        headerTitleBlockColor: migratedData.headerTitleBlockColor ?? '#EDE9F5'
       }
-      
-      console.log('没有找到有效数据，返回空数组')
-      return []
     } catch (e) {
       console.error('加载存储数据失败:', e)
-      return []
+      return {
+        pages: [],
+        headerTitleColor: '#1d1d1f',
+        headerTitleFontSizePx: 16,
+        headerTitleBlockColor: '#EDE9F5'
+      }
     }
   }
 
-  // 页面数据 - 从 localStorage 加载并迁移，如果为空则初始化一个封面页
-  const initialPages = _loadPagesFromStorage()
-  const pages = ref(initialPages.length > 0 ? initialPages : [getInitialPageData('cover')])
-  
+  const initialCatalog = _loadCatalogFromStorage()
+  const pages = ref(initialCatalog.pages.length > 0 ? initialCatalog.pages : [getInitialPageData('cover')])
+
+  /** 全页页眉标题颜色、字号、色块背景（持久化到 localStorage / 导出 JSON） */
+  const headerTitleColor = ref(initialCatalog.headerTitleColor)
+  const headerTitleFontSizePx = ref(initialCatalog.headerTitleFontSizePx)
+  const headerTitleBlockColor = ref(initialCatalog.headerTitleBlockColor)
+
+  /** 上次落盘未成功时为 true，供定时器 / 关闭前补写 */
+  const persistDirty = ref(false)
+
+  /** 将当前图册与页眉设置写入 localStorage；成功则清 dirty，失败则保持 dirty */
+  function persistCatalogSnapshot() {
+    const ok = saveData({
+      pages: pages.value,
+      headerTitleColor: headerTitleColor.value,
+      headerTitleFontSizePx: headerTitleFontSizePx.value,
+      headerTitleBlockColor: headerTitleBlockColor.value
+    })
+    persistDirty.value = !ok
+  }
+
+  const PERSIST_RETRY_MS = 60_000
+  let persistRetryTimer = null
+  if (typeof window !== 'undefined') {
+    persistRetryTimer = window.setInterval(() => {
+      if (persistDirty.value) persistCatalogSnapshot()
+    }, PERSIST_RETRY_MS)
+    const onBeforeUnload = () => {
+      if (persistDirty.value) persistCatalogSnapshot()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    onScopeDispose(() => {
+      if (persistRetryTimer != null) window.clearInterval(persistRetryTimer)
+      window.removeEventListener('beforeunload', onBeforeUnload)
+    })
+  }
+
   // 显示设置
   const showPrice = ref(false)
   const printMode = ref(false)
@@ -360,8 +405,17 @@ export const useCatalogStore = defineStore('catalog', () => {
       commandManager.clear()
       
       // 3. 使用数据迁移工具保存空数据（这会创建版本化的空数据结构）
-      saveData({ pages: [] })
-      
+      headerTitleColor.value = '#1d1d1f'
+      headerTitleFontSizePx.value = 16
+      headerTitleBlockColor.value = '#EDE9F5'
+      const ok = saveData({
+        pages: [],
+        headerTitleColor: '#1d1d1f',
+        headerTitleFontSizePx: 16,
+        headerTitleBlockColor: '#EDE9F5'
+      })
+      persistDirty.value = !ok
+
       // 4. 状态检查：canUndo 和 canRedo 会自动变为 false（因为 commandManager 已清空）
       console.log('系统级清扫完成：页面已清空，撤销/重做历史已清除，数据已保存')
     } else {
@@ -651,62 +705,81 @@ export const useCatalogStore = defineStore('catalog', () => {
    * @param file Excel文件
    */
   function importExcel(file) {
-    if (!file) return; 
-    
-    recordSnapshot(); 
-    
-    const r = new FileReader();
+    if (!file) return
+
+    recordSnapshot()
+
+    const r = new FileReader()
     r.onload = (e) => {
       try {
-        const d = new Uint8Array(e.target.result);
-        const wb = XLSX.read(d, { type: 'array' });
-        const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        
-        let chunk = [];
-        
-        json.forEach(row => {
-          // 兼容各种表头写法
-          const name = row['名称'] || row['Name'] || row['产品名称'];
-          const model = row['型号'] || row['Model'];
-          const spec = row['参数'] || row['规格'] || row['Spec'];
-          const price = row['价格'] || row['Price'];
+        const d = new Uint8Array(e.target.result)
+        const wb = XLSX.read(d, { type: 'array' })
+        const rows = parseSheetToProductRows(wb)
 
-          const p = createProduct({ name, model, spec, price });
-          if (price) p.price = price;
-          
-          chunk.push(p);
+        if (!rows.length) {
+          alert('未读取到数据行，请检查表头是否包含「产品名称」或第一行是否为列名')
+          return
+        }
 
-          // 满6个生成一页
-          if (chunk.length === 6) {
-            pages.value.push({
-              id: nanoid(),
-              type: 'product',
-              subType: 'lock',
-              title: 'Imported Series',
-              items: chunk
-            });
-            chunk = [];
-          }
-        });
+        let chunk = []
+        let currentSubType = null
+        let pageCount = 0
 
-        // 处理剩余未满6个的产品
-        if (chunk.length > 0) {
-          while (chunk.length < 6) chunk.push(createProduct());
+        const flush = (subType) => {
+          if (chunk.length === 0) return
+          padChunkToSix(chunk, subType)
+          const { title, sub } = getProductGridPageMeta(subType)
           pages.value.push({
             id: nanoid(),
-            type: 'product',
-            subType: 'lock',
-            title: 'Imported Series',
-            items: chunk
-          });
+            type: 'productGrid',
+            subType,
+            title,
+            sub,
+            subtitle: sub,
+            items: JSON.parse(JSON.stringify(chunk)),
+            width: 210,
+            height: 297
+          })
+          pageCount += 1
+          chunk.length = 0
         }
-        alert('导入成功！');
+
+        for (const row of rows) {
+          const name = String(row['产品名称'] || row['名称'] || row['Name'] || '').trim()
+          const model = String(row['型号'] || row['Model'] || '').trim()
+          if (!name && !model) continue
+
+          const rowSub = parseCategoryFromExcelRow(row)
+
+          if (chunk.length > 0 && currentSubType !== null && rowSub !== currentSubType) {
+            flush(currentSubType)
+          }
+
+          currentSubType = rowSub
+          chunk.push(buildProductGridItemFromRow(row, rowSub))
+
+          if (chunk.length === MAX_PRODUCT_GRID) {
+            flush(currentSubType)
+            currentSubType = null
+          }
+        }
+
+        if (chunk.length > 0) {
+          flush(currentSubType)
+        }
+
+        if (pageCount === 0) {
+          alert('未导入有效产品行：请至少填写「产品名称」或「型号」，并确认表头含「产品名称」。')
+          return
+        }
+
+        alert(`导入成功！已添加 ${pageCount} 个产品页（六宫格，按品类分页）。`)
       } catch (err) {
-        console.error('Excel导入失败:', err);
-        alert('Excel导入失败，请检查文件格式');
+        console.error('Excel导入失败:', err)
+        alert('Excel导入失败，请检查文件格式')
       }
-    };
-    r.readAsArrayBuffer(file);
+    }
+    r.readAsArrayBuffer(file)
   }
 
   /**
@@ -905,7 +978,7 @@ export const useCatalogStore = defineStore('catalog', () => {
       `
       document.body.appendChild(loadingEl)
 
-      const noPrintEls = document.querySelectorAll('.no-print, .drag-handle, [class*="absolute"][class*="top"][class*="right"], [class*="absolute"][class*="top"][class*="left"]')
+      const noPrintEls = document.querySelectorAll('.no-print, .drag-handle, .img-tools, .uploader, [class*="absolute"][class*="top"][class*="right"], [class*="absolute"][class*="top"][class*="left"]')
       const originalDisplay = []
       noPrintEls.forEach(el => {
         originalDisplay.push(el.style.display)
@@ -982,20 +1055,90 @@ export const useCatalogStore = defineStore('catalog', () => {
     }
   }
 
-  // 数据持久化：自动保存到localStorage（使用版本化管理）
-  watch(pages, (newVal) => {
-    try {
-      // 使用数据迁移工具保存数据（会自动添加版本号）
-      saveData({ pages: newVal })
-    } catch (e) {
-      console.warn('保存数据失败:', e)
-    }
-  }, { deep: true })
+  // 数据持久化：一改即存；失败时 persistDirty 保持，由定时器 / 关闭前补写
+  watch(
+    pages,
+    () => {
+      persistCatalogSnapshot()
+    },
+    { deep: true }
+  )
 
+  watch([headerTitleColor, headerTitleFontSizePx, headerTitleBlockColor], () => {
+    persistCatalogSnapshot()
+  })
+
+  /** 导出 JSON：先规范化空标题等，再下载 */
+  function exportProject() {
+    const snapshot = JSON.parse(JSON.stringify(pages.value))
+    normalizeCatalogPages(snapshot)
+    const data = {
+      pages: snapshot,
+      headerTitleColor: headerTitleColor.value,
+      headerTitleFontSizePx: headerTitleFontSizePx.value,
+      headerTitleBlockColor: headerTitleBlockColor.value,
+      exportDate: new Date().toISOString(),
+      version: String(LATEST_DATA_VERSION)
+    }
+    const dataStr = JSON.stringify(data, null, 2)
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr)
+    const exportFileDefaultName = `雅洁五金工程图册项目_${new Date().toISOString().split('T')[0]}.json`
+    const linkElement = document.createElement('a')
+    linkElement.setAttribute('href', dataUri)
+    linkElement.setAttribute('download', exportFileDefaultName)
+    linkElement.click()
+  }
+
+  /** 从 JSON 文件加载项目并写回 store + localStorage */
+  function loadProject(file) {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(String(e.target?.result || ''))
+        const incoming = Array.isArray(parsed.pages)
+          ? parsed.pages
+          : Array.isArray(parsed)
+            ? parsed
+            : null
+        if (!incoming) {
+          alert('无效的项目文件：需要包含 pages 数组')
+          return
+        }
+        const snapshot = JSON.parse(JSON.stringify(incoming))
+        normalizeCatalogPages(snapshot)
+        pages.value = snapshot
+        if (typeof parsed.headerTitleColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(parsed.headerTitleColor)) {
+          headerTitleColor.value = parsed.headerTitleColor
+        }
+        const fs = parsed.headerTitleFontSizePx
+        if (typeof fs === 'number' && fs >= 10 && fs <= 24) {
+          headerTitleFontSizePx.value = Math.round(fs)
+        }
+        if (typeof parsed.headerTitleBlockColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(parsed.headerTitleBlockColor)) {
+          headerTitleBlockColor.value = parsed.headerTitleBlockColor
+        }
+        const ok = saveData({
+          pages: snapshot,
+          headerTitleColor: headerTitleColor.value,
+          headerTitleFontSizePx: headerTitleFontSizePx.value,
+          headerTitleBlockColor: headerTitleBlockColor.value
+        })
+        persistDirty.value = !ok
+      } catch (err) {
+        console.error(err)
+        alert('读取失败: ' + (err?.message || String(err)))
+      }
+    }
+    reader.readAsText(file)
+  }
 
   // 导出所有方法和状态
   return {
     pages,
+    headerTitleColor,
+    headerTitleFontSizePx,
+    headerTitleBlockColor,
     showPrice,
     printMode,
     clipboardBlock,
@@ -1034,6 +1177,8 @@ export const useCatalogStore = defineStore('catalog', () => {
     triggerPrint,
     exportToPDF,
     exportToPDFImage,
+    exportProject,
+    loadProject,
 
     // 命令模式相关
     useCommandMode,

@@ -12,6 +12,8 @@
 import { computed } from 'vue'
 import A4Page from '../layout/A4Page.vue'
 import { useCatalogStore } from '../../stores/index'
+import { DEFAULT_CELL_CN, DEFAULT_CELL_EN } from '../../utils/pageTextDefaults'
+import EditableText from '../ui/EditableText.vue'
 
 /** 目录项（与 HTML 一致） */
 interface TocItem {
@@ -20,6 +22,8 @@ interface TocItem {
   titleEn: string
   pageNumber: number
   highlight?: boolean
+  /** 可选：手动页码（新增条目/特殊条目用） */
+  pageNumberOverride?: number
 }
 
 /** 章节配置：类型 + 显示文案，用于在 store.pages 中查找页码 */
@@ -51,26 +55,49 @@ const props = withDefaults(
 )
 
 /** 根据章节配置从 store.pages 计算目录项（含页码） */
-const tocItems = computed<TocItem[]>(() => {
-  const pages = store.pages
-  return TOC_SECTION_CONFIG.map((cfg, i) => {
-    const indexStr = String(i + 1).padStart(2, '0')
-    let pageNumber = 0
-    if (cfg.occurrence !== undefined) {
-      const indices = pages
-        .map((p, idx) => (p.type === cfg.type ? idx + 1 : 0))
-        .filter((n) => n > 0)
-      pageNumber = indices[cfg.occurrence - 1] ?? 0
-    } else {
-      const found = pages.findIndex((p) => p.type === cfg.type && (cfg.subType == null || (p as { subType?: string }).subType === cfg.subType))
-      pageNumber = found >= 0 ? found + 1 : 0
-    }
-    return {
-      index: indexStr,
+function ensureTocData() {
+  const page = store.pages[props.pageIndex || 0] as any
+  if (!page) return null
+  if (!Array.isArray(page.tocItems)) {
+    page.tocItems = TOC_SECTION_CONFIG.map((cfg) => ({
+      type: cfg.type,
+      subType: cfg.subType,
+      occurrence: cfg.occurrence,
       title: cfg.title,
       titleEn: cfg.titleEn,
-      pageNumber,
       highlight: cfg.highlight
+    }))
+  }
+  return page.tocItems as any[]
+}
+
+function resolvePageNumber(cfg: any): number {
+  const pages = store.pages
+  if (cfg?.occurrence !== undefined) {
+    const indices = pages
+      .map((p, idx) => (p.type === cfg.type ? idx + 1 : 0))
+      .filter((n) => n > 0)
+    return indices[cfg.occurrence - 1] ?? 0
+  }
+  const found = pages.findIndex(
+    (p) => p.type === cfg.type && (cfg.subType == null || (p as { subType?: string }).subType === cfg.subType)
+  )
+  return found >= 0 ? found + 1 : 0
+}
+
+const tocItems = computed<TocItem[]>(() => {
+  const list = ensureTocData() || []
+  return list.map((cfg, i) => {
+    const indexStr = String(i + 1).padStart(2, '0')
+    const computedPage = cfg.type ? resolvePageNumber(cfg) : 0
+    const pageNumber = typeof cfg.pageNumberOverride === 'number' ? cfg.pageNumberOverride : computedPage
+    return {
+      index: indexStr,
+      title: cfg.title || '',
+      titleEn: cfg.titleEn || '',
+      pageNumber,
+      highlight: cfg.highlight === true,
+      pageNumberOverride: cfg.pageNumberOverride
     }
   })
 })
@@ -88,10 +115,35 @@ function formatPageNumber(num: number): string {
 function shouldHighlight(item: TocItem): boolean {
   return item.highlight === true || item.pageNumber > 7
 }
+
+function updateTocField(index: number, key: string, val: any) {
+  const list = ensureTocData()
+  if (!list || !list[index]) return
+  ;(list[index] as any)[key] = val
+}
+
+function addTocItem() {
+  const list = ensureTocData()
+  if (!list) return
+  list.push({
+    type: '',
+    title: '新增条目',
+    titleEn: 'NEW ITEM',
+    pageNumberOverride: 0,
+    highlight: false
+  })
+}
+
+function removeTocItem(index: number) {
+  const list = ensureTocData()
+  if (!list) return
+  list.splice(index, 1)
+}
 </script>
 
 <template>
   <A4Page
+    :page-index="props.pageIndex"
     page-title="2026 工程产品手册 / 总目录"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
@@ -106,28 +158,53 @@ function shouldHighlight(item: TocItem): boolean {
       <!-- 目录列表 -->
       <ul class="toc-list">
         <li
-          v-for="item in tocItems"
+          v-for="(item, idx) in tocItems"
           :key="item.index"
           class="toc-item"
         >
           <!-- 序号 + 标题 -->
           <span
             class="toc-title"
-            :class="{ 'toc-title--highlight': shouldHighlight(item) }"
           >
-            {{ item.index }} / {{ item.title }}
+            <span class="toc-index">{{ item.index }}</span>
+            <span class="toc-sep">·</span>
+            <EditableText
+              tag="span"
+              class-name="toc-title-txt"
+              :value="item.title || DEFAULT_CELL_CN"
+              @update:value="(v) => updateTocField(idx, 'title', v)"
+            />
           </span>
 
           <!-- 英文标题 -->
-          <span class="toc-en">{{ item.titleEn }}</span>
+          <EditableText
+            tag="span"
+            class-name="toc-en"
+            :value="item.titleEn || DEFAULT_CELL_EN"
+            @update:value="(v) => updateTocField(idx, 'titleEn', v)"
+          />
 
           <!-- 虚线连接符 -->
           <span class="toc-dots"></span>
 
           <!-- 页码 -->
           <span class="toc-page">{{ formatPageNumber(item.pageNumber) }}</span>
+
+          <button
+            v-if="!store.printMode"
+            type="button"
+            class="toc-del no-print"
+            title="删除该行"
+            @click.stop="removeTocItem(idx)"
+          >
+            ×
+          </button>
         </li>
       </ul>
+
+      <div v-if="!store.printMode" class="toc-actions no-print">
+        <button type="button" class="toc-add" @click="addTocItem">＋ 新增一行</button>
+      </div>
     </div>
   </A4Page>
 </template>
@@ -197,7 +274,7 @@ function shouldHighlight(item: TocItem): boolean {
 .toc-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--color-archie-purple, #5E4585);
+  color: var(--color-text-gray, #86868B);
   margin-right: 15px;
 
   /* 防止换行 */
@@ -205,9 +282,18 @@ function shouldHighlight(item: TocItem): boolean {
   font-family: 'Inter', 'Noto Serif SC', sans-serif;
 }
 
-/* 高亮样式：页码 > 07 的项目使用金色 */
-.toc-title--highlight {
-  color: var(--color-archie-gold, #9A805E);
+.toc-index {
+  color: var(--color-text-gray, #86868B);
+  font-variant-numeric: tabular-nums;
+}
+
+.toc-sep {
+  margin: 0 6px;
+  color: rgba(134, 134, 139, 0.55);
+}
+
+:deep(.toc-title-txt) {
+  color: var(--color-text-gray, #86868B);
 }
 
 /* ===== 英文标题 ===== */
@@ -249,6 +335,50 @@ function shouldHighlight(item: TocItem): boolean {
 
   /* 防止换行 */
   white-space: nowrap;
+}
+
+.toc-item {
+  position: relative;
+}
+
+.toc-del {
+  margin-left: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+  line-height: 18px;
+  text-align: center;
+  padding: 0;
+}
+
+.toc-del:hover {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.toc-actions {
+  width: 85%;
+  margin: 6mm auto 0 auto;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.toc-add {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(94, 69, 133, 0.10);
+  color: rgba(94, 69, 133, 0.95);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toc-add:hover {
+  background: rgba(94, 69, 133, 0.16);
 }
 
 /* ===== 打印适配 ===== */

@@ -1,79 +1,114 @@
 <script setup lang="ts">
 /**
- * ProductGridPage.vue - 六宫格产品展示页
- *
- * 基于 CLAUDE.md 规范和 页面代码.txt 样式
- *
- * 功能：
- * - 数据驱动：通过 pageId 自动获取产品和页面信息
- * - 布局：2 列 × 3 行网格，8mm 间距
- * - 健壮性：支持不足 6 个产品的情况
+ * ProductGridPage.vue - 六宫格产品展示页（无线图）
+ * 固定 6 槽；删除仅标记 deleted + 清空，不 splice，网格位置不变。
  */
 import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
+import {
+  MAX_PRODUCT_GRID,
+  createDefaultProductItemForPage,
+  clearedProductSlot,
+  resetProductSlot,
+  isProductSlotFilled
+} from '../../utils/productGridItems'
+import { getProductPageHeaderTitle } from '../../utils/productPageHeaderTitle'
 import A4Page from '../layout/A4Page.vue'
 import ProductCard from '../ProductCard.vue'
 
-// ===== Props 定义 =====
 const props = defineProps<{
-  /** 页面在 store.pages 中的索引 */
   pageIndex: number
 }>()
 
-// ===== Store 初始化 =====
 const store = useCatalogStore()
 
-// ===== 计算属性 =====
+const pageData = computed(() => store.pages[props.pageIndex] || {})
 
-/** 当前页面数据 */
-const pageData = computed(() => {
-  return store.pages[props.pageIndex] || {}
-})
-
-/** 产品列表 */
 const productsList = computed(() => {
-  return pageData.value.items || []
+  const page = pageData.value as Record<string, unknown>
+  if (!page) return []
+  if (!Array.isArray(page.items)) page.items = []
+  const items = page.items as Record<string, unknown>[]
+  while (items.length < MAX_PRODUCT_GRID) {
+    items.push(createDefaultProductItemForPage(page, { composite: false }))
+  }
+  return items.slice(0, MAX_PRODUCT_GRID)
 })
 
-/** 页面标题（用于页眉） */
-const displayTitle = computed(() => {
-  const title = pageData.value.title || '门锁五金系列'
-  const subtitle = pageData.value.sub || pageData.value.subtitle || ''
-  
-  return subtitle 
-    ? `2026 工程产品手册 / ${title} (${subtitle})`
-    : `2026 工程产品手册 / ${title}`
-})
+const filledProductCount = computed(
+  () => productsList.value.filter((p) => isProductSlotFilled(p as Record<string, unknown>)).length
+)
 
-/** 总页数 */
-const totalPages = computed(() => {
-  return store.pages.length
-})
+const canAddProduct = computed(() => filledProductCount.value < MAX_PRODUCT_GRID)
 
-/** 是否有产品数据 */
-const hasProducts = computed(() => {
-  return productsList.value.length > 0
-})
+const hasGridInPrint = computed(() => filledProductCount.value > 0)
+
+/** 与复合页一致：按品类页眉（不区分无线/有线） */
+const displayTitle = computed(() =>
+  getProductPageHeaderTitle(pageData.value as Record<string, unknown>)
+)
+
+const totalPages = computed(() => store.pages.length)
+
+function addProductCell() {
+  const page = store.pages[props.pageIndex] as Record<string, unknown> | undefined
+  if (!page || store.printMode) return
+  if (!Array.isArray(page.items)) page.items = []
+  const sub = (page.subType as string) || 'lock'
+
+  for (let i = 0; i < MAX_PRODUCT_GRID; i++) {
+    const it = page.items[i] as { deleted?: boolean } | undefined
+    if (it?.deleted) {
+      page.items[i] = resetProductSlot(it, sub, { composite: false })
+      return
+    }
+  }
+  for (let i = 0; i < MAX_PRODUCT_GRID; i++) {
+    if (!isProductSlotFilled(page.items[i] as Record<string, unknown>)) {
+      const prev = page.items[i]
+      page.items[i] = resetProductSlot(prev || {}, sub, { composite: false })
+      return
+    }
+  }
+}
+
+function removeProductCell(index: number) {
+  const page = store.pages[props.pageIndex] as Record<string, unknown> | undefined
+  if (!page?.items || !Array.isArray(page.items)) return
+  if (index < 0 || index >= MAX_PRODUCT_GRID) return
+  const prev = page.items[index]
+  if (!prev) return
+  const sub = (page.subType as string) || 'lock'
+  page.items[index] = clearedProductSlot(prev, sub, { composite: false })
+}
 </script>
 
 <template>
   <A4Page
+    :page-index="props.pageIndex"
     :page-title="displayTitle"
     :page-number="props.pageIndex + 1"
     :total-pages="totalPages"
   >
-    <!-- ===== 六宫格产品网格 ===== -->
-    <div v-if="hasProducts" class="grid-6">
+    <div
+      v-if="!store.printMode"
+      class="products-add-row"
+      :class="{ 'products-add-row--hidden': !canAddProduct }"
+    >
+      <button type="button" class="products-add-btn" @click.stop="addProductCell">新增一格</button>
+    </div>
+
+    <div v-if="!store.printMode || hasGridInPrint" class="grid-6">
       <ProductCard
         v-for="(product, idx) in productsList"
-        :key="product.id || idx"
-        :data="product"
+        :key="'product-slot-' + idx"
+        :data="product as any"
         :page-index="props.pageIndex"
         :product-index="idx"
+        :request-remove="() => removeProductCell(idx)"
       />
     </div>
 
-    <!-- ===== 空状态 (优雅展示) ===== -->
     <div v-else class="empty-state">
       <div class="empty-icon">🔒</div>
       <p class="empty-text">暂无产品数据</p>
@@ -83,11 +118,28 @@ const hasProducts = computed(() => {
 </template>
 
 <style scoped>
-/* 
-  产品网格页样式 - 主要样式已在 src/assets/main.css 中定义
-*/
+.products-add-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 5mm;
+}
 
-/* 空状态 */
+.products-add-row--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.products-add-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(94, 69, 133, 0.12);
+  color: var(--archie-purple, #5e4585);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

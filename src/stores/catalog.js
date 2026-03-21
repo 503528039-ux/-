@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 import { PageType, getComponentNameByPageType, createDefaultPageProps } from '../types/catalog'
+import { normalizeCatalogPages } from '../utils/pageTextDefaults'
 
 export const useCatalogStore = defineStore('catalog', () => {
   const pages = ref([])
@@ -779,13 +780,15 @@ export const useCatalogStore = defineStore('catalog', () => {
   
   // 导出项目数据（现有功能兼容）
   function exportProject() {
+    const pagesSnapshot = JSON.parse(JSON.stringify(pages.value))
+    normalizeCatalogPages(pagesSnapshot)
     const data = {
-      pages: pages.value,
+      pages: pagesSnapshot,
       globalProducts: globalProducts.value,
       exportDate: new Date().toISOString(),
       version: '1.0'
     }
-    
+
     const dataStr = JSON.stringify(data, null, 2)
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr)
     

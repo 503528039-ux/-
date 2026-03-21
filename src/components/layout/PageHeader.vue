@@ -5,7 +5,7 @@
  * 基于 页面代码.txt 的设计规范：
  * - 高度：20mm (var(--size-header-height))
  * - 右对齐标题
- * - 字体：11px, 500 weight, 3px 字间距
+ * - 字体：14px, 600 weight, 3px 字间距（与 main.css 页眉默认一致）
  * - 底部边框：0.5px solid
  * - 底部外边距：8mm
  */
@@ -62,13 +62,13 @@ const headerStyle = computed(() => ({
 <style scoped>
 /* 页眉容器 - 精确匹配页面代码.txt规范 */
 .page-header {
-  /* 布局：右对齐、底部对齐 */
+  /* 布局：右对齐、垂直居中（略上移观感） */
   display: flex;
   justify-content: flex-end;
-  align-items: flex-end;
+  align-items: center;
 
-  /* 内边距：左右15mm，底部4mm */
-  padding: 0 var(--size-page-padding, 15mm) 4mm var(--size-page-padding, 15mm);
+  /* 内边距：左右 15mm，上下均衡 */
+  padding: 2mm var(--size-page-padding, 15mm) 2mm var(--size-page-padding, 15mm);
 
   /* 底部外边距 */
   margin-bottom: 8mm;
@@ -76,14 +76,12 @@ const headerStyle = computed(() => ({
   /* 高度由 :style 控制 */
 }
 
-/* 标题文本 - 精确匹配页面代码.txt规范 */
+/* 标题文本 */
 .header-title {
-  /* 字体：11px, 500 weight */
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
 
-  /* 颜色：使用 design-tokens 变量 */
-  color: var(--color-text-gray, #86868B);
+  color: var(--color-text-dark, #1D1D1F);
 
   /* 字间距：3px */
   letter-spacing: 3px;
@@ -105,7 +103,7 @@ const headerStyle = computed(() => ({
   }
 
   .header-title {
-    color: var(--color-text-gray, #86868B);
+    color: var(--color-text-dark, #1D1D1F);
   }
 }
 </style>

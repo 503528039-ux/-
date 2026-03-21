@@ -154,7 +154,7 @@ async function onEmptyDrop(e) {
 </script>
 
 <template>
-  <A4Page :page-number="props.pageIndex + 1">
+  <A4Page :page-index="props.pageIndex" :page-number="props.pageIndex + 1">
     <div v-if="hasData" class="free-page-content">
       <h2 class="section-title">{{ pageData.title || '自由编辑页' }}</h2>
       <p class="section-subtitle">{{ pageData.sub || 'FREE LAYOUT' }}</p>

@@ -48,10 +48,10 @@ function updateDividerNumber(val) {
 
 <template>
   <!-- 过渡页：全紫色背景，无页眉页脚，直接使用绝对定位包裹整页 -->
-  <A4Page :showHeader="false" :showFooter="false">
+  <A4Page :page-index="props.pageIndex" :showHeader="false" :showFooter="false">
     <div class="divider-wrapper">
-      <!-- 超大透明数字背景 -->
-      <EditableText tag="div" className="divider-number" :value="String(dividerNumber)" @update:value="updateDividerNumber" />
+      <!-- 右下角金色线框角标（方案 A） -->
+      <div class="divider-corner" aria-hidden="true"></div>
 
       <!-- 主标题 -->
       <EditableText tag="h2" :value="dividerText" @update:value="updateDividerText" />
@@ -82,23 +82,48 @@ function updateDividerNumber(val) {
   overflow: hidden;
 }
 
-.divider-number {
-  font-size: 450px;
-  font-weight: 900;
-  color: rgba(255, 255, 255, 0.04);
+.divider-corner {
   position: absolute;
-  bottom: -40mm;
-  right: -25mm;
-  line-height: 0.8;
-  font-family: 'Inter', sans-serif;
+  right: 12mm;
+  bottom: 12mm;
+  width: 50mm;
+  height: 50mm;
+  opacity: 0.5;
   z-index: 1;
   pointer-events: none;
 }
 
+.divider-corner::before,
+.divider-corner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-color: rgba(154, 128, 94, 0.65);
+  border-style: solid;
+  border-width: 0;
+}
+
+/* 外层 L 角 */
+.divider-corner::before {
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  border-radius: 2px;
+}
+
+/* 内层 L 角（形成双线框层次） */
+.divider-corner::after {
+  inset: 7mm;
+  border-right-width: 1.5px;
+  border-bottom-width: 1.5px;
+  border-radius: 2px;
+  opacity: 0.75;
+}
+
 :deep(h2) {
   color: #fff;
-  font-size: 56px;
-  letter-spacing: 8px;
+  /* 再放大约 20%（相对 70px） */
+  font-size: 84px;
+  letter-spacing: 6px;
   margin-bottom: 15px;
   position: relative;
   z-index: 2;
@@ -108,18 +133,18 @@ function updateDividerNumber(val) {
 
 :deep(p) {
   color: #9A805E; /* --color-archie-gold */
-  font-size: 14px;
-  letter-spacing: 4px;
+  font-size: 16px;
+  letter-spacing: 3.5px;
   position: relative;
   z-index: 2;
   margin: 0;
 }
 
 .divider-line {
-  width: 80px;
-  height: 1.5px;
+  width: 110px;
+  height: 2px;
   background-color: #9A805E; /* --color-archie-gold */
-  margin-top: 40px;
+  margin-top: 32px;
   position: relative;
   z-index: 2;
 }

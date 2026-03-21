@@ -21,6 +21,26 @@
   --color-warning: #FF9500;            /* 警告 */
   --color-error: #FF3B30;              /* 错误 */
   --color-info: #007AFF;               /* 信息 */
+
+  /* Apple 风点缀：页眉（品牌金/紫低饱和渐变） */
+  --apple-header-top-bar: linear-gradient(
+    90deg,
+    rgba(154, 128, 94, 0.92) 0%,
+    rgba(94, 69, 133, 0.88) 52%,
+    rgba(154, 128, 94, 0.75) 100%
+  );
+  --apple-header-bg: linear-gradient(
+    180deg,
+    rgba(94, 69, 133, 0.045) 0%,
+    rgba(255, 255, 255, 0) 70%
+  );
+  --apple-header-divider: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(94, 69, 133, 0.2) 38%,
+    rgba(154, 128, 94, 0.28) 62%,
+    transparent 100%
+  );
   
   /* ===== 尺寸系统 ===== */
   /* A4纸张物理尺寸 */

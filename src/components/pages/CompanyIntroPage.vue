@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useCatalogStore } from '../../stores/index'
 import A4Page from '../layout/A4Page.vue'
 import ImageUploader from '../ui/ImageUploader.vue'
+import EditableText from '../ui/EditableText.vue'
 
 const props = defineProps({
   pageIndex: {
@@ -22,6 +23,14 @@ const headerTitle = '2026 工程产品手册 / 公司概况'
 function updateField(key, val) {
   if (!store.pages[props.pageIndex]) return
   store.pages[props.pageIndex][key] = val
+}
+
+function updateTitle(val) {
+  updateField('title', val)
+}
+
+function updateSubtitle(val) {
+  updateField('sub', val)
 }
 
 function onHeroImage(src) {
@@ -75,13 +84,14 @@ function cycleHeroFit() {
 
 <template>
   <A4Page
+    :page-index="props.pageIndex"
     :page-title="headerTitle"
     :page-number="props.pageIndex + 1"
     :show-header="true"
     :show-footer="true"
   >
-    <h2 class="section-title">{{ pageData.title || '品牌故事' }}</h2>
-    <div class="section-subtitle">{{ pageData.sub || 'Company Profile' }}</div>
+    <EditableText tag="h2" class-name="section-title" :value="pageData.title || '品牌故事'" @update:value="updateTitle" />
+    <EditableText tag="div" class-name="section-subtitle" :value="pageData.sub || 'Company Profile'" @update:value="updateSubtitle" />
 
     <div class="hero-img">
       <img
@@ -113,9 +123,14 @@ function cycleHeroFit() {
     </div>
 
     <!-- 与 HTML：双栏正文，无额外描边卡片 -->
-    <div class="text-cols" style="white-space: pre-line">
-      {{ pageData.story || '' }}
-    </div>
+    <EditableText
+      tag="div"
+      class-name="text-cols"
+      style="white-space: pre-line"
+      :root-editable="true"
+      :value="pageData.story || ''"
+      @update:value="(v) => updateField('story', v)"
+    />
   </A4Page>
 </template>
 
