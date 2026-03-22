@@ -6,9 +6,10 @@
  */
 
 import { normalizeCatalogPages } from './pageTextDefaults'
+import { buildCatalogDemoPagesAfterCover } from '../config/defaultCatalogPages'
 
 // 当前最新数据版本号
-export const LATEST_DATA_VERSION = 2
+export const LATEST_DATA_VERSION = 3
 
 // 数据存储的 localStorage 键名
 export const STORAGE_KEY = 'archie_catalog_store'
@@ -85,6 +86,24 @@ export const migrations = {
       })
     }
     data.version = 2
+    return data
+  },
+
+  // 从版本 2 迁移到版本 3：若仅有封面一页，则追加标准示例页（公开资料填充在 defaultCatalogPages，不修改 PAGE_TEMPLATES）
+  2: (data) => {
+    console.log('正在从版本 2 迁移到版本 3...')
+    if (data && Array.isArray(data.pages)) {
+      const onlyCover =
+        data.pages.length === 1 &&
+        data.pages[0]?.type === 'cover' &&
+        !data.catalogDemoPagesInserted
+      if (onlyCover) {
+        const extra = buildCatalogDemoPagesAfterCover()
+        data.pages = [...data.pages, ...extra]
+        data.catalogDemoPagesInserted = true
+      }
+    }
+    data.version = 3
     return data
   }
 }

@@ -25,7 +25,9 @@ import { normalizeCatalogPages } from '../utils/pageTextDefaults'
 
 // 导入页面模板工具
 import { getInitialPageData } from '../config/pageTemplates'
+import { buildCatalogDemoPages } from '../config/defaultCatalogPages'
 import { MAX_PRODUCT_GRID, isProductSlotFilled } from '../utils/productGridItems'
+import { appendPdfInvisibleSearchLayer, buildDocumentKeywordsForPdf } from '../utils/catalogSearch.js'
 import {
   parseSheetToProductRows,
   parseCategoryFromExcelRow,
@@ -117,7 +119,9 @@ export const useCatalogStore = defineStore('catalog', () => {
   }
 
   const initialCatalog = _loadCatalogFromStorage()
-  const pages = ref(initialCatalog.pages.length > 0 ? initialCatalog.pages : [getInitialPageData('cover')])
+  const pages = ref(
+    initialCatalog.pages.length > 0 ? initialCatalog.pages : buildCatalogDemoPages()
+  )
 
   /** 全页页眉标题颜色、字号、色块背景（持久化到 localStorage / 导出 JSON） */
   const headerTitleColor = ref(initialCatalog.headerTitleColor)
@@ -440,7 +444,7 @@ export const useCatalogStore = defineStore('catalog', () => {
 
   /**
    * 重置数据
-   * 系统级清扫：清空所有内容，不创建默认页面
+   * 恢复默认示例图册（8 页：封面～过渡；公开资料示例见 defaultCatalogPages.js）
    * 注意：此函数已被 ConfirmModal.vue 包装，用户确认后才会调用
    */
   function resetData() {
@@ -448,27 +452,26 @@ export const useCatalogStore = defineStore('catalog', () => {
     // 这里直接执行清空操作
     
     if (useCommandMode.value) {
-      // 系统级清扫操作（不通过命令模式，避免污染历史记录）
-      // 1. 清空页面数据
-      pages.value = []
-      
-      // 2. 清空命令管理器历史
+      const fresh = buildCatalogDemoPages()
+
+      pages.value = fresh
+
       commandManager.clear()
-      
-      // 3. 使用数据迁移工具保存空数据（这会创建版本化的空数据结构）
+
       headerTitleColor.value = '#1d1d1f'
       headerTitleFontSizePx.value = 16
       headerTitleBlockColor.value = '#EDE9F5'
       const ok = saveData({
-        pages: [],
+        pages: fresh,
         headerTitleColor: '#1d1d1f',
         headerTitleFontSizePx: 16,
         headerTitleBlockColor: '#EDE9F5'
       })
       persistDirty.value = !ok
 
-      // 4. 状态检查：canUndo 和 canRedo 会自动变为 false（因为 commandManager 已清空）
-      console.log('系统级清扫完成：页面已清空，撤销/重做历史已清除，数据已保存')
+      console.log(
+        `已恢复默认示例图册：共 ${fresh.length} 页（荣誉/伙伴/案例/表面为公开资料示例，可审阅后替换）`
+      )
     } else {
       // 旧实现（非命令模式）：清空并创建默认页面
       recordSnapshot();
@@ -1259,7 +1262,8 @@ export const useCatalogStore = defineStore('catalog', () => {
         title: '雅洁五金2026工程图册',
         subject: '工程产品手册',
         author: '雅洁五金有限公司',
-        creator: 'ARCHIE STUDIO'
+        creator: 'ARCHIE STUDIO',
+        keywords: buildDocumentKeywordsForPdf(pages.value)
       })
 
       const mmToPx = targetDpi / 25.4
@@ -1289,6 +1293,8 @@ export const useCatalogStore = defineStore('catalog', () => {
 
           const imgData = canvas.toDataURL(imageType)
           if (i > 0) pdf.addPage()
+          const pageData = pages.value[i]
+          if (pageData) appendPdfInvisibleSearchLayer(pdf, pageData)
           pdf.addImage(imgData, 'PNG', 0, 0, targetWidth, targetHeight, undefined, 'FAST')
         } catch (err) {
           console.error(`处理第${i + 1}页时出错:`, err)

@@ -221,9 +221,11 @@ p {
    ========================================================================== */
 
 .section-title {
+    font-family: "PingFang SC", "PingFang TC", "Heiti SC", "Microsoft YaHei", sans-serif;
     font-size: 28px;
     color: var(--archie-purple);
     margin-bottom: 5px;
+    font-weight: 600;
 }
 
 .section-subtitle {
@@ -255,11 +257,18 @@ p {
 .text-cols {
     display: column;
     column-count: 2;
-    column-gap: 12mm;
-    font-size: 12px;
-    line-height: 2;
+    column-gap: calc(12mm * 1.1);
+    font-family: "PingFang SC", "PingFang TC", "Heiti SC", "Microsoft YaHei", sans-serif;
+    font-size: calc(12px * 1.1);
+    line-height: calc(2 * 1.1);
     color: var(--text-dark);
     text-align: justify;
+    padding-bottom: 8mm;
+}
+
+/* 公司简介页：描边壳内双栏，底部留白由外壳 padding 承担 */
+.text-cols.text-cols--in-shell {
+    padding-bottom: 2mm;
 }
 
 /* ==========================================================================
@@ -498,16 +507,21 @@ p {
    产品 6 宫格核心样式
    ========================================================================== */
 
+/* 行高用 auto：长标签换行后参数区变高时，行随内容增高，避免被 1fr 均分高度裁切 */
 .grid-6 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: repeat(3, 1fr);
-    /* 收紧纵向间距，避免第三行裁切 */
+    grid-template-rows: repeat(3, auto);
+    align-items: start;
     gap: 5mm;
     flex-grow: 1;
     padding-bottom: 0;
-    /* 六宫格整体上移（无线图 / 复合图解共 6 类页） */
     margin-top: -6.5mm;
+}
+
+/* 智能门锁（无线图实拍 + 有线图复合）：六宫格在默认 -6.5mm 基础上再上移 5mm */
+.a4-page.smart-lock-product-page .grid-6 {
+    margin-top: -11.5mm;
 }
 
 .product-card {
@@ -517,8 +531,8 @@ p {
 
 /* 实拍模式图片容器 */
 .card-img-box {
-    /* 适度收紧高度，确保第三行信息区不被页脚裁切 */
-    height: 44mm;
+    /* 略减高度，为参数多行换行留出纵向空间（与 ProductCard scoped 一致） */
+    height: 40mm;
     background-color: rgba(134, 134, 139, 0.04);
     border-radius: 12px;
     display: flex;
@@ -596,11 +610,10 @@ p {
     padding: 0 4px;
 }
 
-/* 产品信息区 */
+/* 产品信息区：高度随参数内容，避免在网格内被拉伸后裁切 */
 .card-info {
-    /* 收紧信息区，确保 3 行卡片完整显示 */
     padding-top: 8px;
-    flex-grow: 1;
+    flex-grow: 0;
     display: flex;
     flex-direction: column;
 }
@@ -635,12 +648,13 @@ p {
 }
 
 .mini-spec-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 8px;
+    row-gap: 2px;
+    align-items: start;
     font-size: 9px;
-    line-height: 1.35;
+    line-height: 1.4;
     border-bottom: 0.5px dashed #E5E5EA;
     padding: 4px 0 4px 0;
 }
@@ -649,18 +663,30 @@ p {
     font-size: 9px;
 }
 
+.mini-spec-row.full-width {
+    grid-template-columns: 1fr;
+}
+
+.mini-spec-row.full-width .mini-value {
+    text-align: left;
+}
+
 .mini-label {
-    flex-shrink: 0;
+    min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
     color: var(--text-gray);
-    line-height: 1.35;
+    line-height: 1.4;
 }
 
 .mini-value {
     min-width: 0;
+    word-break: break-word;
+    overflow-wrap: anywhere;
     text-align: right;
     color: var(--text-dark);
     font-weight: 500;
-    line-height: 1.35;
+    line-height: 1.4;
 }
 
 /* ==========================================================================
@@ -780,15 +806,23 @@ p {
     white-space: nowrap;
 }
 
+/* 年份 + 副标题：苹方常规体，数字与中文统一；非苹果系统走后备无衬线 */
 .cover-page .year {
     font-size: 38px;
-    font-family: 'Inter', -apple-system, sans-serif;
+    font-family: 'PingFang SC', 'PingFang TC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
     color: #ffffff;
     letter-spacing: 10px;
-    font-weight: 300;
+    font-weight: 400;
     margin-left: 0;
     opacity: 0.9;
     white-space: nowrap;
+}
+
+.cover-page .year span {
+    font-size: inherit;
+    font-family: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
 }
 
 /* ==========================================================================

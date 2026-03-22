@@ -49,6 +49,11 @@ const displayTitle = computed(() =>
   getProductPageHeaderTitle(pageData.value as Record<string, unknown>)
 )
 
+/** 智能门锁实拍页：版式微调见 main.css .smart-lock-product-page */
+const a4CustomClass = computed(() =>
+  (pageData.value as Record<string, unknown>).subType === 'smartLock' ? 'smart-lock-product-page' : ''
+)
+
 const totalPages = computed(() => store.pages.length)
 
 function addProductCell() {
@@ -86,6 +91,7 @@ function removeProductCell(index: number) {
 
 <template>
   <A4Page
+    :custom-class="a4CustomClass"
     :page-index="props.pageIndex"
     :page-title="displayTitle"
     :page-number="props.pageIndex + 1"

@@ -127,8 +127,8 @@ function updateDividerNumber(val) {
   margin-bottom: 15px;
   position: relative;
   z-index: 2;
-  font-family: 'Noto Serif SC', serif;
-  font-weight: 700;
+  font-family: "PingFang SC", "PingFang TC", "Heiti SC", "Microsoft YaHei", sans-serif;
+  font-weight: 600;
 }
 
 :deep(p) {

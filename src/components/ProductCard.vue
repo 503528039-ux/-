@@ -68,8 +68,9 @@ const specsList = computed<SpecItem[]>(() => {
   const list = props.data.specs || []
   const pi = props.pageIndex
   const page = typeof pi === 'number' ? (store.pages[pi] as any) : null
-  const isLockPage = page?.subType === 'lock'
-  if (!isLockPage) return list
+  const st = page?.subType
+  const isLockLikePage = st === 'lock' || st === 'smartLock'
+  if (!isLockLikePage) return list
   return list.map((s) => {
     if (!s || typeof s !== 'object') return s
     if (s.label === '规格') return { ...s, label: '可搭配锁体及规格' }
@@ -459,8 +460,8 @@ function onRemoveClick() {
 .card-inner {
   display: flex;
   flex-direction: column;
-  flex: 1;
   min-width: 0;
+  /* 高度随内容增高，避免在固定行高网格内被 flex 压缩裁切参数区 */
 }
 
 .card-inner--deleted {
@@ -486,8 +487,8 @@ function onRemoveClick() {
 
 /* ===== 图片区域基础样式 ===== */
 .card-img-box {
-  /* 收紧高度，避免第三行被页脚裁切 */
-  height: 42mm;
+  /* 略减高度，换行后参数区增高时仍尽量留在 A4 可视区内 */
+  height: 38mm;
   border-radius: 12px;
   display: flex;
   justify-content: center;
@@ -651,7 +652,7 @@ function onRemoveClick() {
 /* ===== 产品信息区域 ===== */
 .card-info {
   padding-top: 6px;
-  flex-grow: 1;
+  flex-grow: 0;
   display: flex;
   flex-direction: column;
 }
@@ -681,19 +682,19 @@ function onRemoveClick() {
   gap: 2px;
 }
 
-/* 规格行 - 使用左侧小圆点替代底部分隔线 */
+/* 规格行：双栏网格，长标签（如「可搭配锁体及规格」）可换行，避免挤没右侧参数值 */
 .mini-spec-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 8px;
+  row-gap: 2px;
+  align-items: start;
   font-size: 9px;
-  line-height: 1.35;
+  line-height: 1.4;
   position: relative;
   border-bottom: none;
   padding: 4px 6px 4px 14px;
   border-radius: 6px;
-  /* 极浅底色，增强条目感但不抢眼 */
   background: rgba(0, 0, 0, 0.02);
 }
 
@@ -701,34 +702,42 @@ function onRemoveClick() {
   content: "";
   position: absolute;
   left: 6px;
-  top: 0.65em;
+  top: 0.55em;
   width: 4px;
   height: 4px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.16);
 }
 
-/* 全宽规格行 */
+/* 全宽规格：标签与值上下排布，适合长文案 */
 .mini-spec-row.full-width {
-  /* 用于需要独占一行的规格 */
+  grid-template-columns: 1fr;
+}
+
+.mini-spec-row.full-width .mini-value {
+  text-align: left;
 }
 
 /* 规格标签 */
 .mini-label {
-  flex-shrink: 0;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   color: var(--color-text-gray, #86868B);
   font-family: var(--font-sans, 'Inter', sans-serif);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 /* 规格值 */
 .mini-value {
   min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
   text-align: right;
   color: var(--color-text-dark, #1D1D1F);
   font-weight: 500;
   font-family: var(--font-sans, 'Inter', sans-serif);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .mini-value :deep(.editable-core) {

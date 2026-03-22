@@ -17,7 +17,7 @@ function trimStr(v) {
 
 /**
  * @param {Record<string, unknown>} page
- * @returns {{ title: string, sub: string, intro?: string, story?: string } | null}
+ * @returns {{ title: string, sub: string, intro?: string, story?: string, storyKicker?: string } | null}
  */
 function getDefaultTextsForPage(page) {
   if (!page || typeof page !== 'object') return null
@@ -64,8 +64,9 @@ function getDefaultTextsForPage(page) {
     if (t === 'surfaceFinishes' && tpl.intro != null) {
       out.intro = String(tpl.intro)
     }
-    if (t === 'companyIntro' && tpl.story != null) {
-      out.story = String(tpl.story)
+    if (t === 'companyIntro') {
+      if (tpl.story != null) out.story = String(tpl.story)
+      if (tpl.storyKicker != null) out.storyKicker = String(tpl.storyKicker)
     }
     return out
   }
@@ -193,6 +194,23 @@ export function normalizePageTextFields(page) {
 
     if (defs.story != null && !trimStr(page.story)) {
       page.story = defs.story
+    }
+
+    if (defs.storyKicker != null && !trimStr(page.storyKicker)) {
+      page.storyKicker = defs.storyKicker
+    }
+  }
+
+  // 公司简介页：不再使用模板默认头图；历史数据若仍为约定路径则清空
+  if (page.type === 'companyIntro') {
+    const h = trimStr(page.heroImage)
+    if (
+      h === '/company-intro-hero.jpg' ||
+      h === '/company-intro-hero.jpeg' ||
+      h === '/company-intro-hero.png' ||
+      h === '/company-intro-hero.webp'
+    ) {
+      page.heroImage = ''
     }
   }
 

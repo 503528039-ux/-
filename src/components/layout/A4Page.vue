@@ -153,8 +153,9 @@ function updateFooterTemplate(val) {
   display: flex;
   flex-direction: column;
   position: relative;
-  /* 保持裁切，避免内容重排后覆盖页脚 */
-  overflow: hidden;
+  /* 横向裁切；纵向允许滚动，避免六宫格参数换行后被裁掉 */
+  overflow-x: hidden;
+  overflow-y: auto;
   /* 关键：允许 page-content 在 flex 布局中正确收缩，避免溢出时把页脚文字裁切 */
   min-height: 0;
 }

@@ -235,8 +235,8 @@ function removeTocItem(index: number) {
   font-size: 32px;
   color: var(--color-archie-purple, #5E4585);
   margin-bottom: 5px;
-  font-family: 'Noto Serif SC', serif;
-  font-weight: 700;
+  font-family: "PingFang SC", "PingFang TC", "Heiti SC", "Microsoft YaHei", sans-serif;
+  font-weight: 600;
 }
 
 /* ===== 副标题 ===== */

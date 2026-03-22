@@ -41,6 +41,13 @@ const hasGridInPrint = computed(() => filledProductCount.value > 0)
 /** 与六宫格页一致：按品类页眉（不区分无线/有线） */
 const displayTitle = computed(() => getProductPageHeaderTitle(pageData.value))
 
+/** 智能门锁复合页：版式微调见 main.css .smart-lock-product-page */
+const a4CustomClass = computed(() =>
+  (pageData.value.subType || '') === 'smartLock'
+    ? 'composite-mode smart-lock-product-page'
+    : 'composite-mode'
+)
+
 function addProductCell() {
   const page = store.pages[props.pageIndex]
   if (!page || store.printMode) return
@@ -74,7 +81,7 @@ function removeProductCell(index) {
 
 <template>
   <A4Page
-    :custom-class="'composite-mode'"
+    :custom-class="a4CustomClass"
     :page-index="props.pageIndex"
     :page-title="displayTitle"
     :page-number="props.pageIndex + 1"

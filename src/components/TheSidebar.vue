@@ -1,8 +1,10 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useCatalogStore } from '../stores/index'
 import * as XLSX from 'xlsx'
 import ConfirmModal from './ConfirmModal.vue'
+import { pageMatchesQuery } from '../utils/catalogSearch.js'
+import { scrollCatalogPageToIndex } from '../utils/catalogPageScroll.js'
 
 const store = useCatalogStore()
 const excelInput = { click: () => document.getElementById('xls-in').click() }
@@ -73,6 +75,33 @@ function sidebarApplyBatchReorder() {
     batchReorderTarget.value = ''
     showToastMessage('已调整选中页顺序')
   }
+}
+
+/** 编辑器内搜索：页眉、型号、各页可编辑正文等（基于 page 数据，非 DOM） */
+const editorSearchQuery = ref('')
+
+const editorSearchResults = computed(() => {
+  const q = String(editorSearchQuery.value ?? '').trim()
+  if (!q || !store.pages.length) return []
+  return store.pages
+    .map((page, index) => ({ page, index }))
+    .filter(({ page }) => pageMatchesQuery(page, q))
+    .map(({ page, index }) => ({
+      index,
+      pageNumber: index + 1,
+      label: sidebarPageBriefLabel(page)
+    }))
+})
+
+function sidebarPageBriefLabel(page) {
+  const t = pageTypeNames[page.type] || page.type || '页面'
+  const st = page.subType ? pageSubtypeNames[page.subType] || page.subType : ''
+  return st ? `${t} · ${st}` : t
+}
+
+function jumpToSearchPage(pageNumber1Based) {
+  const r = scrollCatalogPageToIndex(pageNumber1Based, store.pages.length)
+  if (!r.ok) showToastMessage(r.message || '跳转失败')
 }
 
 // 简单的 Toast 提示
@@ -180,7 +209,7 @@ function handleResetConfirm() {
 // 确认清空
 function handleResetConfirmed() {
   store.resetData()
-  showToastMessage('数据已安全清除')
+  showToastMessage('已恢复默认示例图册（8 页，含公开资料示例，可审阅修改）')
 }
 
 // 取消清空
@@ -382,6 +411,31 @@ watch(sidebarSplitMode, (on) => {
           <span class="sidebar-chevron text-gray-400 shrink-0" :class="{ 'sidebar-chevron--open': sidebarSectionOpen.pageOrder }">▶</span>
         </button>
         <div v-show="sidebarSectionOpen.pageOrder" class="px-2 pb-2 pt-0 space-y-2">
+      <div v-if="store.pages.length" class="rounded-lg border border-gray-200 bg-white p-2 space-y-1.5">
+        <div class="text-[10px] text-gray-500 font-bold">搜索页面 / 型号 / 正文</div>
+        <input
+          v-model="editorSearchQuery"
+          type="search"
+          enterkeyhint="search"
+          autocomplete="off"
+          placeholder="输入关键字…"
+          class="w-full px-2 py-1 text-[11px] border border-gray-200 rounded-md focus:border-[#5e4585] focus:ring-1 focus:ring-[#5e4585]/30 outline-none"
+        >
+        <p v-if="editorSearchQuery.trim() && !editorSearchResults.length" class="text-[9px] text-gray-400">无匹配页</p>
+        <ul v-else-if="editorSearchQuery.trim() && editorSearchResults.length" class="max-h-28 overflow-y-auto space-y-0.5 text-[10px]">
+          <li v-for="r in editorSearchResults" :key="r.index">
+            <button
+              type="button"
+              class="w-full text-left px-1.5 py-0.5 rounded hover:bg-[#f5f3fa] text-gray-800 truncate"
+              :title="r.label"
+              @click="jumpToSearchPage(r.pageNumber)"
+            >
+              <span class="font-mono text-gray-500">P{{ r.pageNumber }}</span>
+              {{ r.label }}
+            </button>
+          </li>
+        </ul>
+      </div>
       <div class="flex gap-2">
           <button @click="store.undo()" :disabled="!store.canUndo" class="btn-undo flex items-center justify-center flex-1">↩</button>
           <button @click="store.redo()" :disabled="!store.canRedo" class="btn-undo flex items-center justify-center flex-1">↪</button>
@@ -652,10 +706,10 @@ watch(sidebarSplitMode, (on) => {
         :class="sidebarSplitMode ? 'grid-cols-1' : 'grid-cols-2'"
       >
           <button @click="store.triggerPrint()" class="btn-dark text-xs flex items-center justify-center gap-1">🖨 预览</button>
-          <button @click="store.exportToPDF()" class="btn-success text-xs flex items-center justify-center gap-1" title="印刷级：系统打印到PDF（文字矢量，推荐）">📄 PDF</button>
+          <button @click="store.exportToPDF()" class="btn-success text-xs flex items-center justify-center gap-1" title="系统「存储为 PDF」：正文多为可选文字，适合 Ctrl+F 搜中文">📄 PDF</button>
       </div>
       <div class="grid grid-cols-1 gap-2 mt-1">
-          <button @click="store.exportToPDFImage({ targetDpi: 300 })" class="btn-tool text-xs flex items-center justify-center gap-1" title="备选：高清图片PDF（300DPI，文件更大）">🖼 高清PDF</button>
+          <button @click="store.exportToPDFImage({ targetDpi: 300 })" class="btn-tool text-xs flex items-center justify-center gap-1" title="整页位图 300DPI；已叠隐性英文/型号层与文档关键词，中文全文查找优先用「PDF」打印导出">🖼 高清PDF</button>
       </div>
       
       <div class="sidebar-hint p-2 rounded-xl text-[10px] leading-tight">
